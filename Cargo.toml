@@ -1,0 +1,13 @@
+[package]
+name = "echors"
+version = "0.0.1-alpha"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+config-file = "0.2.3"
+futures = "0.3.28"
+serde = {version = "1.0.178", features=["derive"]}
+string-builder = "0.2.0"
+tokio = { version = "1.29.1", features = ["full"]} 
