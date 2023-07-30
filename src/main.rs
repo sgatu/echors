@@ -10,16 +10,11 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::{OwnedSemaphorePermit, Semaphore},
 };
 
 use crate::state::serverstate::ServerState;
 
-async fn manage_socket(
-    mut socket: TcpStream,
-    permit: OwnedSemaphorePermit,
-    server_state: Arc<Mutex<ServerState>>,
-) {
+async fn manage_socket(mut socket: TcpStream, server_state: Arc<Mutex<ServerState>>) {
     let socket_addr = socket.peer_addr().unwrap();
     println!("Client {} connected.", socket_addr);
     let result = loop {
@@ -55,7 +50,6 @@ async fn manage_socket(
     };
     server_state.lock().unwrap().current_connections -= 1;
     eprintln!("Closing socket {} due to {}", socket_addr, result);
-    drop(permit);
 }
 
 async fn process_cmd(cmd: &str, server_state: &Arc<Mutex<ServerState>>) -> Result<Vec<u8>, String> {
@@ -78,16 +72,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_state = Arc::new(Mutex::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
     println!("Starting server. Binding on: {}", &app_cfg.bind);
     let listener: TcpListener = TcpListener::bind(&app_cfg.bind).await?;
-    let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));
+    //let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));
     loop {
-        let permit = max_conn_limiter.clone().acquire_owned().await.unwrap();
+        // let permit = max_conn_limiter.clone().acquire_owned().await.unwrap();
         match listener.accept().await {
             Ok((mut _socket, _addr)) => {
                 println!("New client {:?}", _addr);
                 let mut mut_state_data = server_state.lock().unwrap();
-                mut_state_data.current_connections += 1;
-                mut_state_data.total_connections += 1;
-                tokio::spawn(manage_socket(_socket, permit, server_state.clone()));
+                if mut_state_data.current_connections >= app_cfg.max_connections as u32 {
+                    println!("Dropping {:?} due to max_conn limitation", _addr);
+                    drop(_socket);
+                } else {
+                    mut_state_data.current_connections += 1;
+                    mut_state_data.total_connections += 1;
+                    tokio::spawn(manage_socket(_socket, server_state.clone()));
+                }
             }
             Err(e) => println!("{:?}", e),
         }
