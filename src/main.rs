@@ -4,6 +4,10 @@ mod state;
 use config::ApplicationConfig;
 use config_file::FromConfigFile;
 use parking_lot::RwLock;
+use state::datastate::DataState;
+use state::datastate::DataType;
+use std::borrow::BorrowMut;
+use std::mem;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -12,7 +16,11 @@ use tokio::{
 
 use crate::state::serverstate::ServerState;
 
-async fn manage_socket(mut socket: TcpStream, server_state: Arc<RwLock<ServerState>>) {
+async fn manage_socket(
+    mut socket: TcpStream,
+    server_state: Arc<RwLock<ServerState>>,
+    data_state: Arc<DataState>,
+) {
     let socket_addr = socket.peer_addr().unwrap();
     println!("Client {} connected.", socket_addr);
     let result = loop {
@@ -36,7 +44,7 @@ async fn manage_socket(mut socket: TcpStream, server_state: Arc<RwLock<ServerSta
 
         let cmd = String::from_utf8_lossy(&next_buff).into_owned();
         println!("Received {} from {:?}", cmd, socket_addr);
-        let result = match process_cmd(&cmd, &server_state).await {
+        let result = match process_cmd(&cmd, &server_state, &data_state).await {
             Ok(data) => data,
             Err(message) => message.as_bytes().to_vec(),
         };
@@ -56,6 +64,7 @@ async fn manage_socket(mut socket: TcpStream, server_state: Arc<RwLock<ServerSta
 async fn process_cmd(
     cmd: &str,
     server_state: &Arc<RwLock<ServerState>>,
+    data_state: &Arc<DataState>,
 ) -> Result<Vec<u8>, String> {
     let str_state;
     {
@@ -69,7 +78,76 @@ async fn process_cmd(
             Ok(info.as_bytes().to_vec())
         }
         "test" => Ok("OK".as_bytes().to_vec()),
-        _ => Err(format!("Invalid command {}", cmd).to_owned()),
+        _ => {
+            let cmd_start = cmd.split_once(' ').map(|(p, s)| p).unwrap_or(cmd);
+            // ToDo: change to lexer
+            let cmd_params: Vec<&str> = cmd
+                .split_ascii_whitespace()
+                .enumerate()
+                .filter_map(|(i, p)| (i != 0).then(|| p)) // skip first element, the command
+                .collect();
+            match cmd_start {
+                "set" => {
+                    if cmd_params.len() != 2 {
+                        return Err(format!("Command {} requires 2 paramters", cmd).to_owned());
+                    } else {
+                        {
+                            let key = *cmd_params.get(0).unwrap();
+                            {
+                                let read_state = data_state.data.read();
+                                if !read_state.contains_key(key) {
+                                    drop(read_state);
+                                    {
+                                        let mut write_state = data_state.data.write();
+                                        write_state.insert(
+                                            key.to_owned(),
+                                            RwLock::new(DataType::String(
+                                                (*cmd_params.get(1).unwrap()).to_owned(),
+                                            )),
+                                        );
+                                    }
+                                } else {
+                                    let mut value_lock = read_state.get(key).unwrap().write();
+                                    {
+                                        let _ = mem::replace(
+                                            &mut *value_lock,
+                                            DataType::String(
+                                                (*cmd_params.get(1).unwrap()).to_owned(),
+                                            ),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Ok("OK".as_bytes().to_vec())
+                    }
+                }
+                "get" => {
+                    if cmd_params.len() != 1 {
+                        return Err(format!("Command {} requires 1 paramters", cmd).to_owned());
+                    } else {
+                        let key = *cmd_params.get(0).unwrap();
+                        let read_state = data_state.data.read();
+                        if !read_state.contains_key(key) {
+                            Ok("Err: Key not found".as_bytes().to_vec())
+                        } else {
+                            let val_lock = read_state.get(key).unwrap();
+
+                            let result = unsafe {
+                                match val_lock.data_ptr().as_mut().unwrap() {
+                                    DataType::String(v) => Ok(v.as_bytes().to_vec()),
+                                    DataType::Number(v) => Ok(v.to_vec()),
+                                    DataType::List(_) => Err("Cannot get list".to_owned()),
+                                }
+                            };
+
+                            return result;
+                        }
+                    }
+                }
+                _ => Err(format!("Invalid command {}", cmd_start).to_owned()),
+            }
+        }
     };
 }
 #[tokio::main]
@@ -78,6 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ApplicationConfig::from_config_file(PathBuf::from("./echors.toml")).unwrap();
 
     let server_state = Arc::new(RwLock::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
+    let data_state = Arc::new(DataState::new());
     println!("Starting server. Binding on: {}", &app_cfg.bind);
     let listener: TcpListener = TcpListener::bind(&app_cfg.bind).await?;
     //let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));
@@ -100,7 +179,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         mut_state_data.total_connections += 1;
                         drop(mut_state_data);
                     }
-                    tokio::spawn(manage_socket(_socket, server_state.clone()));
+                    tokio::spawn(manage_socket(
+                        _socket,
+                        server_state.clone(),
+                        data_state.clone(),
+                    ));
                 }
             }
             Err(e) => println!("{:?}", e),
