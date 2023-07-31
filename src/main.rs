@@ -3,10 +3,8 @@ mod state;
 
 use config::ApplicationConfig;
 use config_file::FromConfigFile;
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use parking_lot::RwLock;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -14,7 +12,7 @@ use tokio::{
 
 use crate::state::serverstate::ServerState;
 
-async fn manage_socket(mut socket: TcpStream, server_state: Arc<Mutex<ServerState>>) {
+async fn manage_socket(mut socket: TcpStream, server_state: Arc<RwLock<ServerState>>) {
     let socket_addr = socket.peer_addr().unwrap();
     println!("Client {} connected.", socket_addr);
     let result = loop {
@@ -48,16 +46,26 @@ async fn manage_socket(mut socket: TcpStream, server_state: Arc<Mutex<ServerStat
             break format!("failed to write to socket; err = {:?}", e);
         }
     };
-    server_state.lock().unwrap().current_connections -= 1;
+    {
+        let mut mut_ser_state = server_state.write();
+        mut_ser_state.current_connections -= 1;
+    }
     eprintln!("Closing socket {} due to {}", socket_addr, result);
 }
 
-async fn process_cmd(cmd: &str, server_state: &Arc<Mutex<ServerState>>) -> Result<Vec<u8>, String> {
-    let mut state = server_state.lock().unwrap();
-    state.processed_commands += 1;
+async fn process_cmd(
+    cmd: &str,
+    server_state: &Arc<RwLock<ServerState>>,
+) -> Result<Vec<u8>, String> {
+    let str_state;
+    {
+        let mut state = server_state.write();
+        state.processed_commands += 1;
+        str_state = state.to_string();
+    }
     return match cmd {
         "info" => {
-            let info = state.to_string();
+            let info = str_state.to_string();
             Ok(info.as_bytes().to_vec())
         }
         "test" => Ok("OK".as_bytes().to_vec()),
@@ -69,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_cfg: ApplicationConfig =
         ApplicationConfig::from_config_file(PathBuf::from("./echors.toml")).unwrap();
 
-    let server_state = Arc::new(Mutex::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
+    let server_state = Arc::new(RwLock::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
     println!("Starting server. Binding on: {}", &app_cfg.bind);
     let listener: TcpListener = TcpListener::bind(&app_cfg.bind).await?;
     //let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));
@@ -77,14 +85,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // let permit = max_conn_limiter.clone().acquire_owned().await.unwrap();
         match listener.accept().await {
             Ok((mut _socket, _addr)) => {
-                println!("New client {:?}", _addr);
-                let mut mut_state_data = server_state.lock().unwrap();
-                if mut_state_data.current_connections >= app_cfg.max_connections as u32 {
+                let current_connections;
+                {
+                    let ro_state_data = server_state.read();
+                    current_connections = ro_state_data.current_connections;
+                }
+                if current_connections >= app_cfg.max_connections as u32 {
                     println!("Dropping {:?} due to max_conn limitation", _addr);
                     drop(_socket);
                 } else {
-                    mut_state_data.current_connections += 1;
-                    mut_state_data.total_connections += 1;
+                    {
+                        let mut mut_state_data = server_state.write();
+                        mut_state_data.current_connections += 1;
+                        mut_state_data.total_connections += 1;
+                        drop(mut_state_data);
+                    }
                     tokio::spawn(manage_socket(_socket, server_state.clone()));
                 }
             }

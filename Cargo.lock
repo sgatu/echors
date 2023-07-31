@@ -79,6 +79,7 @@ version = "0.0.1-alpha"
 dependencies = [
  "config-file",
  "futures",
+ "parking_lot",
  "serde",
  "string-builder",
  "tokio",
