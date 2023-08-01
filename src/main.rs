@@ -89,7 +89,7 @@ async fn process_cmd(
         }
         "test" => Ok("OK".as_bytes().to_vec()),
         _ => {
-            let cmd_start = cmd.split_once(' ').map(|(p, s)| p).unwrap_or(cmd);
+            let cmd_start = cmd.split_once(' ').map(|(p, _)| p).unwrap_or(cmd);
             // ToDo: change to lexer
             let cmd_params: Vec<&str> = cmd
                 .split_ascii_whitespace()
@@ -142,13 +142,11 @@ async fn process_cmd(
                             Err("Key not found".to_owned())
                         } else {
                             let val_lock = read_state.get(key).unwrap();
-                            let _ = val_lock.read();
-                            let result = unsafe {
-                                match val_lock.data_ptr().as_ref().unwrap() {
-                                    DataType::String(v) => Ok(v.as_bytes().to_vec()),
-                                    DataType::Number(v) => Ok(v.to_vec()),
-                                    DataType::List(_) => Err("Cannot get list".to_owned()),
-                                }
+                            let val_read = val_lock.read();
+                            let result = match &*val_read {
+                                DataType::String(v) => Ok(v.as_bytes().to_vec()),
+                                DataType::Number(v) => Ok(v.to_vec()),
+                                DataType::List(_) => Err("Cannot get list".to_owned()),
                             };
 
                             return result;
