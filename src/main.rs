@@ -6,7 +6,6 @@ use config_file::FromConfigFile;
 use parking_lot::RwLock;
 use state::datastate::DataState;
 use state::datastate::DataType;
-use std::borrow::BorrowMut;
 use std::mem;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{
@@ -15,7 +14,11 @@ use tokio::{
 };
 
 use crate::state::serverstate::ServerState;
-
+#[repr(u8)]
+pub enum CommandResult {
+    OK = 1,
+    ERR = 2,
+}
 async fn manage_socket(
     mut socket: TcpStream,
     server_state: Arc<RwLock<ServerState>>,
@@ -44,9 +47,16 @@ async fn manage_socket(
 
         let cmd = String::from_utf8_lossy(&next_buff).into_owned();
         println!("Received {} from {:?}", cmd, socket_addr);
-        let result = match process_cmd(&cmd, &server_state, &data_state).await {
-            Ok(data) => data,
-            Err(message) => message.as_bytes().to_vec(),
+        let mut result: Vec<u8> = Vec::new();
+        match process_cmd(&cmd, &server_state, &data_state).await {
+            Ok(mut data) => {
+                result.push(CommandResult::OK as u8);
+                result.append(&mut data);
+            }
+            Err(message) => {
+                result.push(CommandResult::ERR as u8);
+                result.append(&mut message.as_bytes().to_vec());
+            }
         };
 
         // Write the data back
@@ -129,12 +139,12 @@ async fn process_cmd(
                         let key = *cmd_params.get(0).unwrap();
                         let read_state = data_state.data.read();
                         if !read_state.contains_key(key) {
-                            Ok("Err: Key not found".as_bytes().to_vec())
+                            Err("Key not found".to_owned())
                         } else {
                             let val_lock = read_state.get(key).unwrap();
-
+                            let _ = val_lock.read();
                             let result = unsafe {
-                                match val_lock.data_ptr().as_mut().unwrap() {
+                                match val_lock.data_ptr().as_ref().unwrap() {
                                     DataType::String(v) => Ok(v.as_bytes().to_vec()),
                                     DataType::Number(v) => Ok(v.to_vec()),
                                     DataType::List(_) => Err("Cannot get list".to_owned()),
