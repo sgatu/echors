@@ -5,7 +5,9 @@ use parking_lot::RwLock;
 
 use crate::state::{datastate::DataState, serverstate::ServerState};
 
-use super::implcommands::{get::GetCmd, info::InfoCmd, sets::SetSCmd, test::TestCmd};
+use super::implcommands::{
+    get::GetCmd, incri::IncrI, info::InfoCmd, seti::SetI, sets::SetSCmd, test::TestCmd,
+};
 
 #[derive(Debug)]
 pub struct Command<'a> {
@@ -13,7 +15,7 @@ pub struct Command<'a> {
     pub arguments: Vec<&'a [u8]>,
 }
 impl Command<'_> {
-    pub fn execute(
+    pub fn execute<'a>(
         self: &Self,
         data_state: &Arc<DataState>,
         server_state_rwl: &Arc<RwLock<ServerState>>,
@@ -21,7 +23,9 @@ impl Command<'_> {
         match self.command_type {
             CommandType::Info => InfoCmd::execute(server_state_rwl),
             CommandType::Test => TestCmd::execute(),
-            CommandType::SetS => SetSCmd::execute(data_state, self),
+            CommandType::SetString => SetSCmd::execute(data_state, self),
+            CommandType::SetInt => SetI::execute(data_state, self),
+            CommandType::IncrementInt => IncrI::execute(data_state, self),
             CommandType::Get => GetCmd::execute(data_state, self),
             _ => Err("Unknown command".to_owned()),
         }
@@ -33,12 +37,13 @@ impl Command<'_> {
 pub enum CommandType {
     Info,
     Test,
-    SetS,
-    SetI,
-    SetF,
+    SetString,
+    SetInt,
+    SetFloat,
     Get,
     Delete,
-    Increment,
+    IncrementInt,
+    IncrementFloat,
     Unknown,
 }
 impl From<[u8; 2]> for CommandType {

@@ -51,9 +51,9 @@ async fn manage_socket(
         let mut response: Vec<u8> = Vec::new();
         match command_result {
             Ok(cmd) => match process_cmd(&cmd, &server_state, &data_state).await {
-                Ok(mut data) => {
+                Ok(data) => {
                     response.push(CommandResult::OK as u8);
-                    response.append(&mut data);
+                    response.append(&mut (data.to_vec()));
                 }
                 Err(message) => {
                     response.push(CommandResult::ERR as u8);
@@ -78,7 +78,7 @@ async fn manage_socket(
     eprintln!("Closing socket {} due to {}", socket_addr, result);
 }
 
-async fn process_cmd(
+async fn process_cmd<'a>(
     cmd: &Command<'_>,
     server_state: &Arc<RwLock<ServerState>>,
     data_state: &Arc<DataState>,

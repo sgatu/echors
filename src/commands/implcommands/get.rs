@@ -7,7 +7,10 @@ use crate::{
 
 pub struct GetCmd {}
 impl GetCmd {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute<'a>(
+        data_state: &Arc<DataState>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() != 1 {
             return Err("Command GET requires 1 paramter".to_owned());
         } else {
@@ -19,8 +22,9 @@ impl GetCmd {
                 let val_lock = read_state.get(key).unwrap();
                 let val_read = val_lock.read();
                 let result = match &*val_read {
-                    DataType::String(v) => Ok(Some(v.as_bytes().to_vec())),
-                    DataType::Number(v) => Ok(Some(v.to_vec())),
+                    DataType::String(v) => Ok(Some(v.to_bytes().to_vec())),
+                    DataType::Int(v) => Ok(Some((&v.to_bytes()).to_vec())),
+                    DataType::Float(v) => Ok(Some((&v.to_bytes()).to_vec())),
                     DataType::List(_) => Err("Cannot get list".to_owned()),
                 };
                 return result;

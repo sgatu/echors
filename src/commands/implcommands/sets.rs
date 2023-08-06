@@ -4,15 +4,13 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{DataState, DataType},
+    state::datastate::{Data, DataState, DataType},
 };
 use std::mem;
 
 pub struct SetSCmd {}
 impl SetSCmd {
     pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
-        /*let state = server_state_rwl.read();
-        return Ok(Some(state.to_string().as_bytes().to_vec()));*/
         if cmd.arguments.len() != 2 {
             return Err("Invalid number of arguments for SETS command".to_owned());
         }
@@ -30,13 +28,16 @@ impl SetSCmd {
 
                     write_state.insert(
                         key.to_owned(),
-                        RwLock::new(DataType::String(value.to_owned())),
+                        RwLock::new(DataType::String(Data::<String>::new(value.to_owned()))),
                     );
                 }
                 Ok(None)
             } else {
                 let mut value_lock = read_state.get(key).unwrap().write();
-                let _ = mem::replace(&mut *value_lock, DataType::String(value.to_owned()));
+                let _ = mem::replace(
+                    &mut *value_lock,
+                    DataType::String(Data::<String>::new(value.to_owned())),
+                );
                 Ok(None)
             }
         }
