@@ -8,6 +8,9 @@ edition = "2021"
 [dependencies]
 config-file = "0.2.3"
 futures = "0.3.28"
+num = "0.4.1"
+num-derive = "0.4.0"
+num-traits = "0.2.16"
 parking_lot = "0.12.1"
 serde = {version = "1.0.178", features=["derive"]}
 string-builder = "0.2.0"

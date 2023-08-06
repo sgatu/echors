@@ -1,6 +1,10 @@
+mod commands;
 mod config;
 mod state;
 
+use commands::commands::Command;
+use commands::commands::CommandExecute;
+use commands::commands::CommandType;
 use config::ApplicationConfig;
 use config_file::FromConfigFile;
 use parking_lot::RwLock;
@@ -13,6 +17,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
+use crate::commands::parser::Parser;
 use crate::state::serverstate::ServerState;
 #[repr(u8)]
 pub enum CommandResult {
@@ -45,22 +50,28 @@ async fn manage_socket(
             Err(e) => break format!("failed to read from socket; err = {:?}", e),
         };
 
-        let cmd = String::from_utf8_lossy(&next_buff).into_owned();
-        println!("Received {} from {:?}", cmd, socket_addr);
-        let mut result: Vec<u8> = Vec::new();
-        match process_cmd(&cmd, &server_state, &data_state).await {
-            Ok(mut data) => {
-                result.push(CommandResult::OK as u8);
-                result.append(&mut data);
+        //let cmd = String::from_utf8_lossy(&next_buff).into_owned();
+        let command_result = Parser::parse(&next_buff);
+        let mut response: Vec<u8> = Vec::new();
+        match command_result {
+            Ok(cmd) => match process_cmd(&cmd, &server_state, &data_state).await {
+                Ok(mut data) => {
+                    response.push(CommandResult::OK as u8);
+                    response.append(&mut data);
+                }
+                Err(message) => {
+                    response.push(CommandResult::ERR as u8);
+                    response.append(&mut message.as_bytes().to_vec());
+                }
+            },
+            Err(()) => {
+                response.push(CommandResult::ERR as u8);
+                response.append(&mut "Could not process command".as_bytes().to_vec());
             }
-            Err(message) => {
-                result.push(CommandResult::ERR as u8);
-                result.append(&mut message.as_bytes().to_vec());
-            }
-        };
+        }
 
         // Write the data back
-        if let Err(e) = socket.write_all(&result).await {
+        if let Err(e) = socket.write_all(&response).await {
             break format!("failed to write to socket; err = {:?}", e);
         }
     };
@@ -72,97 +83,27 @@ async fn manage_socket(
 }
 
 async fn process_cmd(
-    cmd: &str,
+    cmd: &dyn CommandExecute,
     server_state: &Arc<RwLock<ServerState>>,
     data_state: &Arc<DataState>,
 ) -> Result<Vec<u8>, String> {
-    let str_state;
     {
         let mut state = server_state.write();
         state.processed_commands += 1;
-        str_state = state.to_string();
     }
-    return match cmd {
-        "info" => {
-            let info = str_state.to_string();
-            Ok(info.as_bytes().to_vec())
-        }
-        "test" => Ok("OK".as_bytes().to_vec()),
-        _ => {
-            let cmd_start = cmd.split_once(' ').map(|(p, _)| p).unwrap_or(cmd);
-            // ToDo: change to lexer
-            let cmd_params: Vec<&str> = cmd
-                .split_ascii_whitespace()
-                .enumerate()
-                .filter_map(|(i, p)| (i != 0).then(|| p)) // skip first element, the command
-                .collect();
-            match cmd_start {
-                "set" => {
-                    if cmd_params.len() != 2 {
-                        return Err(format!("Command {} requires 2 paramters", cmd).to_owned());
-                    } else {
-                        {
-                            let key = *cmd_params.get(0).unwrap();
-                            {
-                                let read_state = data_state.data.read();
-                                if !read_state.contains_key(key) {
-                                    drop(read_state);
-                                    {
-                                        let mut write_state = data_state.data.write();
-                                        write_state.insert(
-                                            key.to_owned(),
-                                            RwLock::new(DataType::String(
-                                                (*cmd_params.get(1).unwrap()).to_owned(),
-                                            )),
-                                        );
-                                    }
-                                } else {
-                                    let mut value_lock = read_state.get(key).unwrap().write();
-                                    {
-                                        let _ = mem::replace(
-                                            &mut *value_lock,
-                                            DataType::String(
-                                                (*cmd_params.get(1).unwrap()).to_owned(),
-                                            ),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        Ok("OK".as_bytes().to_vec())
-                    }
-                }
-                "get" => {
-                    if cmd_params.len() != 1 {
-                        return Err(format!("Command {} requires 1 paramters", cmd).to_owned());
-                    } else {
-                        let key = *cmd_params.get(0).unwrap();
-                        let read_state = data_state.data.read();
-                        if !read_state.contains_key(key) {
-                            Err("Key not found".to_owned())
-                        } else {
-                            let val_lock = read_state.get(key).unwrap();
-                            let val_read = val_lock.read();
-                            let result = match &*val_read {
-                                DataType::String(v) => Ok(v.as_bytes().to_vec()),
-                                DataType::Number(v) => Ok(v.to_vec()),
-                                DataType::List(_) => Err("Cannot get list".to_owned()),
-                            };
-
-                            return result;
-                        }
-                    }
-                }
-                _ => Err(format!("Invalid command {}", cmd_start).to_owned()),
-            }
-        }
-    };
+    let result = cmd.execute(data_state, server_state);
+    match result {
+        Ok(o) => match o {
+            Some(o) => Ok(o),
+            None => Ok("OK".as_bytes().to_vec()),
+        },
+        Err(e) => Err(e),
+    }
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_cfg: ApplicationConfig =
         ApplicationConfig::from_config_file(PathBuf::from("./echors.toml")).unwrap();
-
     let server_state = Arc::new(RwLock::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
     let data_state = Arc::new(DataState::new());
     println!("Starting server. Binding on: {}", &app_cfg.bind);
