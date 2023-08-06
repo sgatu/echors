@@ -25,7 +25,6 @@ impl SetSCmd {
                 drop(read_state);
                 {
                     let mut write_state = data_state.data.write();
-
                     write_state.insert(
                         key.to_owned(),
                         RwLock::new(DataType::String(Data::<String>::new(value.to_owned()))),

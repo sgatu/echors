@@ -10,28 +10,26 @@ pub struct Data<T> {
     data: T,
 }
 
-impl Data<Mutex<i32>> {
-    pub fn new(num: Mutex<i32>) -> Self {
+impl Data<i32> {
+    pub fn new(num: i32) -> Self {
         Self { data: num }
     }
     pub fn incr(&mut self, by: i32) {
-        let mut mutval = self.data.lock();
-        *mutval += by;
+        self.data += by;
     }
     pub fn to_bytes(&self) -> [u8; 4] {
-        return i32::to_le_bytes(*self.data.lock());
+        return i32::to_le_bytes(self.data);
     }
 }
-impl Data<Mutex<f32>> {
-    pub fn new(num: Mutex<f32>) -> Self {
+impl Data<f32> {
+    pub fn new(num: f32) -> Self {
         Self { data: num }
     }
-    pub fn incr(&self, val: f32) {
-        let mut mutval = self.data.lock();
-        *mutval += val;
+    pub fn incr(&mut self, val: f32) {
+        self.data += val;
     }
     pub fn to_bytes(&self) -> [u8; 4] {
-        return f32::to_le_bytes(*self.data.lock());
+        return f32::to_le_bytes(self.data);
     }
 }
 impl Data<String> {
@@ -57,8 +55,8 @@ impl<T> Data<T> {
 }
 
 pub enum DataType {
-    Int(Data<Mutex<i32>>),
-    Float(Data<Mutex<f32>>),
+    Int(Mutex<Data<i32>>),
+    Float(Mutex<Data<f32>>),
     String(Data<String>),
     List(Data<Vec<String>>),
 }

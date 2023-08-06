@@ -1,5 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
+use num_traits::ToBytes;
 use parking_lot::{Mutex, RwLock};
 
 use crate::{
@@ -30,25 +31,32 @@ impl IncrI {
 
         {
             let read_state = data_state.data.read();
-
+            let response: Vec<u8>;
             if !read_state.contains_key(key) {
                 drop(read_state);
+
                 {
                     let mut write_state = data_state.data.write();
                     // we set value to incryBy if none was specified
                     write_state.insert(
                         key.to_owned(),
-                        RwLock::new(DataType::Int(Data::<Mutex<i32>>::new(Mutex::new(by)))),
+                        RwLock::new(DataType::Int(Mutex::new(Data::<i32>::new(by)))),
                     );
+                    response = by.to_le_bytes().to_vec();
                 }
-                Ok(None)
+                Ok(Some(response))
             } else {
-                let mut value_lock = read_state.get(key).unwrap().write();
-                value_lock = match &*value_lock {
-                    DataType::Int(mut i) => i.incr(by),
+                let value_lock = read_state.get(key).unwrap().write();
+                match &*value_lock {
+                    DataType::Int(i) => {
+                        let mut lock = i.lock();
+                        lock.incr(by);
+                        response = lock.get().to_le_bytes().to_vec();
+                    }
+
                     _ => return Err("Invalid type".to_owned()),
                 };
-                Ok(None)
+                Ok(Some(response))
             }
         }
     }
