@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use num_traits::ToBytes;
 use parking_lot::{Mutex, RwLock};
