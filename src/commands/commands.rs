@@ -1,0 +1,61 @@
+use std::sync::Arc;
+
+use num_derive::FromPrimitive;
+use parking_lot::RwLock;
+
+use crate::state::{datastate::DataState, serverstate::ServerState};
+
+use super::implcommands::{get::GetCmd, info::InfoCmd, sets::SetSCmd, test::TestCmd};
+
+pub trait CommandExecute: Sync + Send {
+    fn execute(
+        self: &Self,
+        data_state_rwl: &Arc<DataState>,
+        server_state_rwl: &Arc<RwLock<ServerState>>,
+    ) -> Result<Option<Vec<u8>>, String>;
+}
+
+impl CommandExecute for Command<'_> {
+    fn execute(
+        self: &Self,
+        data_state: &Arc<DataState>,
+        server_state_rwl: &Arc<RwLock<ServerState>>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        match self.command_type {
+            CommandType::Info => InfoCmd::execute(server_state_rwl),
+            CommandType::Test => TestCmd::execute(),
+            CommandType::SetS => SetSCmd::execute(data_state, self),
+            CommandType::Get => GetCmd::execute(data_state, self),
+            _ => Err("Unknown command".to_owned()),
+        }
+    }
+}
+#[derive(Debug)]
+pub struct Command<'a> {
+    pub command_type: CommandType,
+    pub arguments: Vec<&'a [u8]>,
+}
+
+#[derive(FromPrimitive, Debug)]
+#[repr(u16)]
+pub enum CommandType {
+    Info,
+    Test,
+    SetS,
+    SetI,
+    SetF,
+    Get,
+    Delete,
+    Increment,
+    Unknown,
+}
+impl From<[u8; 2]> for CommandType {
+    fn from(value: [u8; 2]) -> Self {
+        let num = u16::from_le_bytes([value[0], value[1]]);
+        let element = num::FromPrimitive::from_u16(num);
+        match element {
+            Some(cmd) => cmd,
+            _ => CommandType::Unknown,
+        }
+    }
+}
