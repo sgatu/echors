@@ -3,14 +3,10 @@ mod config;
 mod state;
 
 use commands::commands::Command;
-use commands::commands::CommandExecute;
-use commands::commands::CommandType;
 use config::ApplicationConfig;
 use config_file::FromConfigFile;
 use parking_lot::RwLock;
 use state::datastate::DataState;
-use state::datastate::DataType;
-use std::mem;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -83,15 +79,15 @@ async fn manage_socket(
 }
 
 async fn process_cmd(
-    cmd: &dyn CommandExecute,
+    cmd: &Command<'_>,
     server_state: &Arc<RwLock<ServerState>>,
     data_state: &Arc<DataState>,
 ) -> Result<Vec<u8>, String> {
-    {
+    let result = cmd.execute(data_state, server_state);
+    if !result.is_err() {
         let mut state = server_state.write();
         state.processed_commands += 1;
     }
-    let result = cmd.execute(data_state, server_state);
     match result {
         Ok(o) => match o {
             Some(o) => Ok(o),

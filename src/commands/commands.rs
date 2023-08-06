@@ -7,16 +7,13 @@ use crate::state::{datastate::DataState, serverstate::ServerState};
 
 use super::implcommands::{get::GetCmd, info::InfoCmd, sets::SetSCmd, test::TestCmd};
 
-pub trait CommandExecute: Sync + Send {
-    fn execute(
-        self: &Self,
-        data_state_rwl: &Arc<DataState>,
-        server_state_rwl: &Arc<RwLock<ServerState>>,
-    ) -> Result<Option<Vec<u8>>, String>;
+#[derive(Debug)]
+pub struct Command<'a> {
+    pub command_type: CommandType,
+    pub arguments: Vec<&'a [u8]>,
 }
-
-impl CommandExecute for Command<'_> {
-    fn execute(
+impl Command<'_> {
+    pub fn execute(
         self: &Self,
         data_state: &Arc<DataState>,
         server_state_rwl: &Arc<RwLock<ServerState>>,
@@ -29,11 +26,6 @@ impl CommandExecute for Command<'_> {
             _ => Err("Unknown command".to_owned()),
         }
     }
-}
-#[derive(Debug)]
-pub struct Command<'a> {
-    pub command_type: CommandType,
-    pub arguments: Vec<&'a [u8]>,
 }
 
 #[derive(FromPrimitive, Debug)]
