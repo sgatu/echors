@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
 pub struct DataState {
     pub data: RwLock<HashMap<String, RwLock<DataType>>>,
@@ -14,9 +14,6 @@ impl Data<i32> {
     pub fn new(num: i32) -> Self {
         Self { data: num }
     }
-    pub fn incr(&mut self, by: i32) {
-        self.data += by;
-    }
     pub fn to_bytes(&self) -> [u8; 4] {
         return i32::to_le_bytes(self.data);
     }
@@ -24,9 +21,6 @@ impl Data<i32> {
 impl Data<f32> {
     pub fn new(num: f32) -> Self {
         Self { data: num }
-    }
-    pub fn incr(&mut self, val: f32) {
-        self.data += val;
     }
     pub fn to_bytes(&self) -> [u8; 4] {
         return f32::to_le_bytes(self.data);
@@ -52,11 +46,14 @@ impl<T> Data<T> {
     pub fn get(&self) -> &T {
         return &self.data;
     }
+    pub fn get_mut(&mut self) -> &mut T {
+        return &mut self.data;
+    }
 }
 
 pub enum DataType {
-    Int(Mutex<Data<i32>>),
-    Float(Mutex<Data<f32>>),
+    Int(Data<i32>),
+    Float(Data<f32>),
     String(Data<String>),
     List(Data<Vec<String>>),
 }

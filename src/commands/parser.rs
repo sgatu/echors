@@ -45,7 +45,7 @@ impl Parser {
         data = split.1;
         let len_split: [u8; 4] = [split.0[0], split.0[1], split.0[2], split.0[3]];
         let len = u32::from_le_bytes(len_split);
-        println!("Expected arg len {:?}", len);
+        //println!("Expected arg len {:?}", len);
         match data.len() {
             l if l < len as usize => Err(ArgResult::Error),
             _ => Ok(data.split_at(len as usize)),

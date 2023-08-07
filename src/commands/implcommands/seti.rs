@@ -35,16 +35,13 @@ impl SetI {
 
                     write_state.insert(
                         key.to_owned(),
-                        RwLock::new(DataType::Int(Mutex::new(Data::<i32>::new(value)))),
+                        RwLock::new(DataType::Int(Data::<i32>::new(value))),
                     );
                 }
                 Ok(None)
             } else {
                 let mut value_lock = read_state.get(key).unwrap().write();
-                let _ = mem::replace(
-                    &mut *value_lock,
-                    DataType::Int(Mutex::new(Data::<i32>::new(value))),
-                );
+                let _ = mem::replace(&mut *value_lock, DataType::Int(Data::<i32>::new(value)));
                 Ok(None)
             }
         }

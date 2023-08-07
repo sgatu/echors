@@ -40,18 +40,18 @@ impl IncrI {
                     // we set value to incryBy if none was specified
                     write_state.insert(
                         key.to_owned(),
-                        RwLock::new(DataType::Int(Mutex::new(Data::<i32>::new(by)))),
+                        RwLock::new(DataType::Int(Data::<i32>::new(by))),
                     );
                     response = by.to_le_bytes().to_vec();
                 }
                 Ok(Some(response))
             } else {
-                let value_lock = read_state.get(key).unwrap().write();
-                match &*value_lock {
-                    DataType::Int(i) => {
-                        let mut lock = i.lock();
-                        lock.incr(by);
-                        response = lock.get().to_le_bytes().to_vec();
+                let mut value_lock = read_state.get(key).unwrap().write();
+                match *value_lock {
+                    DataType::Int(ref mut i) => {
+                        let curr_val = i.get_mut();
+                        *curr_val += by;
+                        response = (*curr_val).to_le_bytes().to_vec();
                     }
 
                     _ => return Err("Invalid type".to_owned()),
