@@ -1,3 +1,3 @@
 pub mod commands;
-pub mod implcommands;
+mod implcommands;
 pub mod parser;

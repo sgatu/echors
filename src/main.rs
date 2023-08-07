@@ -13,8 +13,8 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::commands::parser::Parser;
 use crate::state::serverstate::ServerState;
+use crate::{commands::parser::Parser, state::datastate::DataTypeByte};
 #[repr(u8)]
 pub enum CommandResult {
     OK = 1,
@@ -57,11 +57,13 @@ async fn manage_socket(
                 }
                 Err(message) => {
                     response.push(CommandResult::ERR as u8);
+                    response.push(DataTypeByte::String as u8);
                     response.append(&mut message.as_bytes().to_vec());
                 }
             },
             Err(()) => {
                 response.push(CommandResult::ERR as u8);
+                response.push(DataTypeByte::String as u8);
                 response.append(&mut "Could not process command".as_bytes().to_vec());
             }
         }
@@ -88,10 +90,13 @@ async fn process_cmd<'a>(
         let mut state = server_state.write();
         state.processed_commands += 1;
     }
+    let mut ok_result_message: Vec<u8> = Vec::new();
+    ok_result_message.push(DataTypeByte::String as u8);
+    ok_result_message.append(&mut "OK".as_bytes().to_vec());
     match result {
         Ok(o) => match o {
             Some(o) => Ok(o),
-            None => Ok("OK".as_bytes().to_vec()),
+            None => Ok(ok_result_message),
         },
         Err(e) => Err(e),
     }

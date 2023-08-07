@@ -22,10 +22,9 @@ impl GetCmd {
                 let val_lock = read_state.get(key).unwrap();
                 let val_read = val_lock.read();
                 let result = match &*val_read {
-                    DataType::String(v) => Ok(Some(v.to_bytes().to_vec())),
-                    DataType::Int(v) => Ok(Some((v.to_bytes()).to_vec())),
-                    DataType::Float(v) => Ok(Some((v.to_bytes()).to_vec())),
-                    DataType::List(_) => Err("Cannot get list".to_owned()),
+                    DataType::String(v) => Ok(Some(v.serialize().to_vec())),
+                    DataType::Int(v) => Ok(Some(v.serialize().to_vec())),
+                    DataType::Float(v) => Ok(Some(v.serialize().to_vec())),
                 };
                 return result;
             }

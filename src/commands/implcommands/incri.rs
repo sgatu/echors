@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use num_traits::ToBytes;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
@@ -34,15 +33,12 @@ impl IncrI {
             let response: Vec<u8>;
             if !read_state.contains_key(key) {
                 drop(read_state);
-
                 {
                     let mut write_state = data_state.data.write();
+                    let _data = Data::<i32>::new(by);
+                    response = _data.serialize().to_vec();
                     // we set value to incryBy if none was specified
-                    write_state.insert(
-                        key.to_owned(),
-                        RwLock::new(DataType::Int(Data::<i32>::new(by))),
-                    );
-                    response = by.to_le_bytes().to_vec();
+                    write_state.insert(key.to_owned(), RwLock::new(DataType::Int(_data)));
                 }
                 Ok(Some(response))
             } else {
@@ -51,7 +47,7 @@ impl IncrI {
                     DataType::Int(ref mut i) => {
                         let curr_val = i.get_mut();
                         *curr_val += by;
-                        response = (*curr_val).to_le_bytes().to_vec();
+                        response = i.serialize().to_vec();
                     }
 
                     _ => return Err("Invalid type".to_owned()),

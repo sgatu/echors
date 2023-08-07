@@ -27,7 +27,7 @@ impl SetSCmd {
                     let mut write_state = data_state.data.write();
                     write_state.insert(
                         key.to_owned(),
-                        RwLock::new(DataType::String(Data::<String>::new(value.to_owned()))),
+                        RwLock::new(DataType::String(Data::<Vec<u8>>::new(value.to_owned()))),
                     );
                 }
                 Ok(None)
@@ -35,7 +35,7 @@ impl SetSCmd {
                 let mut value_lock = read_state.get(key).unwrap().write();
                 let _ = mem::replace(
                     &mut *value_lock,
-                    DataType::String(Data::<String>::new(value.to_owned())),
+                    DataType::String(Data::<Vec<u8>>::new(value.to_owned())),
                 );
                 Ok(None)
             }
