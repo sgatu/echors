@@ -15,13 +15,12 @@ impl GetCmd {
             return Err("Command GET requires 1 paramter".to_owned());
         } else {
             let key = std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key.")?;
-            let read_state = data_state.data.read();
-            if !read_state.contains_key(key) {
+            if !data_state.data.contains_key(key) {
                 Err("Key not found".to_owned())
             } else {
-                let val_lock = read_state.get(key).unwrap();
-                let val_read = val_lock.read();
-                let result = match &*val_read {
+                let result = data_state.data.get(key).unwrap();
+                let value = result.value();
+                let result = match &*value {
                     DataType::String(v) => Ok(Some(v.serialize().to_vec())),
                     DataType::Int(v) => Ok(Some(v.serialize().to_vec())),
                     DataType::Float(v) => Ok(Some(v.serialize().to_vec())),

@@ -29,22 +29,21 @@ impl IncrF {
         }
 
         {
-            let read_state = data_state.data.read();
             let response: Vec<u8>;
-            if !read_state.contains_key(key) {
-                drop(read_state);
-
+            if !data_state.data.contains_key(key) {
                 {
-                    let mut write_state = data_state.data.write();
                     let _data = Data::<f32>::new(by);
                     response = _data.serialize().to_vec();
                     // we set value to incryBy if none was specified
-                    write_state.insert(key.to_owned(), RwLock::new(DataType::Float(_data)));
+                    data_state
+                        .data
+                        .insert(key.to_owned(), DataType::Float(_data));
                 }
                 Ok(Some(response))
             } else {
-                let mut value_lock = read_state.get(key).unwrap().write();
-                match *value_lock {
+                let mut result = data_state.data.get_mut(key).unwrap();
+                let data = result.value_mut();
+                match data {
                     DataType::Float(ref mut i) => {
                         let curr_val = i.get_mut();
                         *curr_val += by;

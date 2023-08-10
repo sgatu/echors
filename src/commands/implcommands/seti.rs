@@ -26,21 +26,17 @@ impl SetI {
         ];
         let value: i32 = i32::from_le_bytes(numb);
         {
-            let read_state = data_state.data.read();
-
-            if !read_state.contains_key(key) {
-                drop(read_state);
+            if !data_state.data.contains_key(key) {
                 {
-                    let mut write_state = data_state.data.write();
-                    write_state.insert(
-                        key.to_owned(),
-                        RwLock::new(DataType::Int(Data::<i32>::new(value))),
-                    );
+                    data_state
+                        .data
+                        .insert(key.to_owned(), DataType::Int(Data::<i32>::new(value)));
                 }
                 Ok(None)
             } else {
-                let mut value_lock = read_state.get(key).unwrap().write();
-                let _ = mem::replace(&mut *value_lock, DataType::Int(Data::<i32>::new(value)));
+                let mut result = data_state.data.get_mut(key).unwrap();
+                let data = result.value_mut();
+                let _ = mem::replace(&mut *data, DataType::Int(Data::<i32>::new(value)));
                 Ok(None)
             }
         }

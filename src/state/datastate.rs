@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use string_builder::ToBytes;
 
 pub struct DataState {
-    pub data: RwLock<HashMap<String, RwLock<DataType>>>,
+    pub data: DashMap<String, DataType>,
 }
 #[repr(u8)]
 pub enum DataTypeByte {
@@ -88,7 +87,7 @@ pub enum DataType {
 impl DataState {
     pub fn new() -> Self {
         Self {
-            data: RwLock::new(HashMap::new()),
+            data: DashMap::new(),
         }
     }
 }
