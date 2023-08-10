@@ -1,5 +1,4 @@
 use dashmap::DashMap;
-use parking_lot::RwLock;
 use string_builder::ToBytes;
 
 pub struct DataState {

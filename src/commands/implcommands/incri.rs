@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use parking_lot::RwLock;
-
 use crate::{
     commands::commands::Command,
     state::datastate::{Data, DataState, DataType},
