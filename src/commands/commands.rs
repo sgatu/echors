@@ -6,8 +6,8 @@ use parking_lot::RwLock;
 use crate::state::{datastate::DataState, serverstate::ServerState};
 
 use super::implcommands::{
-    get::GetCmd, incrf::IncrF, incri::IncrI, info::InfoCmd, setf::SetF, seti::SetI, sets::SetSCmd,
-    test::TestCmd,
+    delete::DeleteCmd, get::GetCmd, incrf::IncrF, incri::IncrI, info::InfoCmd, setf::SetF,
+    seti::SetI, sets::SetSCmd, test::TestCmd,
 };
 
 #[derive(Debug)]
@@ -30,6 +30,7 @@ impl Command<'_> {
             CommandType::IncrementInt => IncrI::execute(data_state, self),
             CommandType::IncrementFloat => IncrF::execute(data_state, self),
             CommandType::Get => GetCmd::execute(data_state, self),
+            CommandType::Delete => DeleteCmd::execute(data_state, self),
             _ => Err("Unknown command".to_owned()),
         }
     }

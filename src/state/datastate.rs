@@ -1,6 +1,6 @@
 use dashmap::DashMap;
+use std::cmp;
 use string_builder::ToBytes;
-
 pub struct DataState {
     pub data: DashMap<String, DataType>,
 }
@@ -9,12 +9,18 @@ pub enum DataTypeByte {
     Integer = 1,
     Float = 2,
     String = 3,
+    StrList = 4,
 }
 pub struct Data<T> {
     data: T,
 }
 
-impl Data<i32> {
+type StringType = Data<Vec<u8>>;
+type ListType = Data<Vec<StringType>>;
+type IntType = Data<i32>;
+type FloatType = Data<f32>;
+
+impl IntType {
     pub fn new(num: i32) -> Self {
         Self { data: num }
     }
@@ -35,7 +41,7 @@ impl Data<i32> {
         return full_serialized;
     }
 }
-impl Data<f32> {
+impl FloatType {
     pub fn new(num: f32) -> Self {
         Self { data: num }
     }
@@ -55,7 +61,71 @@ impl Data<f32> {
         return full_serialized;
     }
 }
-impl Data<Vec<u8>> {
+
+// Str list
+impl ListType {
+    pub fn new(elements: Vec<String>) -> Self {
+        let mut result: Vec<StringType> = Vec::new();
+        for e in elements {
+            result.push(Data::<Vec<u8>>::new(e));
+        }
+        Self { data: result }
+    }
+    pub fn srlz_range(&self, end: usize) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        result.push(DataTypeByte::StrList as u8);
+        for i in 0..cmp::min(end, self.data.len()) {
+            result.extend(self.data[i].serialize());
+        }
+        return result;
+    }
+    pub fn srlz_range_with_start(&self, start: usize, end: usize) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        result.push(DataTypeByte::StrList as u8);
+        let start_cmp = cmp::min(start, self.data.len());
+        let end_cmp = cmp::min(end, self.data.len());
+        if end_cmp <= start_cmp {
+            return result;
+        }
+        for i in start_cmp..end_cmp {
+            result.extend(self.data[i].serialize());
+        }
+        return result;
+    }
+    pub fn push(&mut self, data: StringType) -> Result<(), ()> {
+        self.data.push(data);
+        return Ok(());
+    }
+    pub fn pop(&mut self) -> Option<StringType> {
+        return self.data.pop();
+    }
+    pub fn srlz_extract_range(&mut self, end: usize) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        result.push(DataTypeByte::StrList as u8);
+        let mut max = cmp::min(end, self.data.len());
+        while max > 0 {
+            result.extend(self.data.remove(0).serialize());
+            max -= 1;
+        }
+        return result;
+    }
+    pub fn srlz_extract_range_with_start(&mut self, start: usize, end: usize) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        result.push(DataTypeByte::StrList as u8);
+        let start_cmp = cmp::min(start, self.data.len());
+        let end_cmp = cmp::min(end, self.data.len());
+        if end_cmp <= start_cmp {
+            return result;
+        }
+        let mut max = start_cmp;
+        while max < end_cmp {
+            result.extend(self.data.remove(start_cmp).serialize());
+            max += 1;
+        }
+        return result;
+    }
+}
+impl StringType {
     pub fn new(str: String) -> Self {
         let mut asvecdata: Vec<u8> = Vec::new();
         let data_type = DataTypeByte::String as u8;
@@ -81,7 +151,7 @@ pub enum DataType {
     Int(Data<i32>),
     Float(Data<f32>),
     String(Data<Vec<u8>>),
-    //List(Data<Vec<String>>),
+    List(Data<Vec<u8>>),
 }
 impl DataState {
     pub fn new() -> Self {

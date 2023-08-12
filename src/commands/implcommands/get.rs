@@ -7,10 +7,7 @@ use crate::{
 
 pub struct GetCmd {}
 impl GetCmd {
-    pub fn execute<'a>(
-        data_state: &Arc<DataState>,
-        cmd: &Command,
-    ) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() != 1 {
             return Err("Command GET requires 1 paramter".to_owned());
         } else {
@@ -24,6 +21,7 @@ impl GetCmd {
                     DataType::String(v) => Ok(Some(v.serialize().to_vec())),
                     DataType::Int(v) => Ok(Some(v.serialize().to_vec())),
                     DataType::Float(v) => Ok(Some(v.serialize().to_vec())),
+                    _ => Err("Data type is not simple".to_owned()),
                 };
                 return result;
             }
