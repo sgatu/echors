@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{DataState, DataType, ListType},
+    state::datastate::{DataState, DataType},
 };
 
 pub struct LLenCmd {}
