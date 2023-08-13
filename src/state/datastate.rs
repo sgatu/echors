@@ -10,6 +10,8 @@ pub enum DataTypeByte {
     Float = 2,
     String = 3,
     StrList = 4,
+    Map = 5,
+    HLL = 6,
 }
 pub struct Data<T> {
     data: T,

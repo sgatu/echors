@@ -98,8 +98,10 @@ class EchoRSClient
         $keylen = pack('V', strlen($key));
         $cmd = EchoRSCommands::ListPush->value . $keylen . $key;
         foreach ($values as $val) {
-            $len = pack('V', strlen($val));
-            $cmd .= $len . $val;
+            //force parse to string
+            $strVal = strval($val);
+            $len = pack('V', strlen($strVal));
+            $cmd .= $len . $strVal;
         }
         return $this->processCommand($cmd);
     }
