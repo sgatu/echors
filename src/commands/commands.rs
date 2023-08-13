@@ -6,8 +6,18 @@ use parking_lot::RwLock;
 use crate::state::{datastate::DataState, serverstate::ServerState};
 
 use super::implcommands::{
-    delete::DeleteCmd, get::GetCmd, incrf::IncrF, incri::IncrI, info::InfoCmd, setf::SetF,
-    seti::SetI, sets::SetSCmd, test::TestCmd,
+    delete::DeleteCmd,
+    get::GetCmd,
+    incrf::IncrF,
+    incri::IncrI,
+    info::InfoCmd,
+    list::{
+        lextract::LExtractCmd, llen::LLenCmd, lpop::LPopCmd, lpush::LPushCmd, lrange::LRangeCmd,
+    },
+    setf::SetF,
+    seti::SetI,
+    sets::SetSCmd,
+    test::TestCmd,
 };
 
 #[derive(Debug)]
@@ -31,6 +41,11 @@ impl Command<'_> {
             CommandType::IncrementFloat => IncrF::execute(data_state, self),
             CommandType::Get => GetCmd::execute(data_state, self),
             CommandType::Delete => DeleteCmd::execute(data_state, self),
+            CommandType::ListPush => LPushCmd::execute(data_state, self),
+            CommandType::ListExtract => LExtractCmd::execute(data_state, self),
+            CommandType::ListPop => LPopCmd::execute(data_state, self),
+            CommandType::ListRange => LRangeCmd::execute(data_state, self),
+            CommandType::ListLength => LLenCmd::execute(data_state, self),
             _ => Err("Unknown command".to_owned()),
         }
     }
@@ -48,6 +63,11 @@ pub enum CommandType {
     Delete,
     IncrementInt,
     IncrementFloat,
+    ListPush,
+    ListPop,
+    ListRange,
+    ListExtract,
+    ListLength,
     Unknown,
 }
 impl From<[u8; 2]> for CommandType {

@@ -58,13 +58,16 @@ async fn manage_socket(
                 Err(message) => {
                     response.push(CommandResult::ERR as u8);
                     response.push(DataTypeByte::String as u8);
+                    response.append(&mut u32::to_le_bytes(message.len() as u32).to_vec());
                     response.append(&mut message.as_bytes().to_vec());
                 }
             },
             Err(()) => {
+                let err_msg = "Could not process command";
                 response.push(CommandResult::ERR as u8);
                 response.push(DataTypeByte::String as u8);
-                response.append(&mut "Could not process command".as_bytes().to_vec());
+                response.append(&mut u32::to_le_bytes(err_msg.len() as u32).to_vec());
+                response.append(&mut err_msg.as_bytes().to_vec());
             }
         }
 
@@ -92,6 +95,7 @@ async fn process_cmd<'a>(
     }
     let mut ok_result_message: Vec<u8> = Vec::new();
     ok_result_message.push(DataTypeByte::String as u8);
+    ok_result_message.append(&mut u32::to_le_bytes(2).to_vec());
     ok_result_message.append(&mut "OK".as_bytes().to_vec());
     match result {
         Ok(o) => match o {
