@@ -16,7 +16,10 @@ enum EchoRSCommands: string
     case ListRange = "\x0b\x00";
     case ListExtract = "\x0c\x00";
     case ListLength = "\x0d\x00";
-    case Unknown = "\x0e\x00";
+    case HLLAdd = "\x0e\x00";
+    case HLLCount = "\x0f\x00";
+    case HLLReset = "\x10\x00";
+    case Unknown = "\x11\x00";
 }
 enum EchoRSCommandResult: string
 {
@@ -29,6 +32,8 @@ enum ResultType: int
     case FLOAT = 2;
     case STRING = 3;
     case LIST = 4;
+    case MAP = 5;
+    case LONG = 6;
 }
 class EchoRSClient
 {
@@ -133,6 +138,30 @@ class EchoRSClient
         $cmd = EchoRSCommands::ListLength->value . $keylen . $key;
         return $this->processCommand($cmd);
     }
+    public function hllAdd(string $key, array $values)
+    {
+        $keylen = pack('V', strlen($key));
+        $cmd = EchoRSCommands::HLLAdd->value . $keylen . $key;
+        foreach ($values as $val) {
+            //force parse to string
+            $strVal = strval($val);
+            $len = pack('V', strlen($strVal));
+            $cmd .= $len . $strVal;
+        }
+        return $this->processCommand($cmd);
+    }
+    public function hllCount(string $key)
+    {
+        $keylen = pack('V', strlen($key));
+        $cmd = EchoRSCommands::HLLCount->value . $keylen . $key;
+        return $this->processCommand($cmd);
+    }
+    public function hllReset(string $key)
+    {
+        $keylen = pack('V', strlen($key));
+        $cmd = EchoRSCommands::HLLReset->value . $keylen . $key;
+        return $this->processCommand($cmd);
+    }
     private function interpretList(string $data)
     {
         $data = substr($data, 1); // remove byte of list type
@@ -158,6 +187,7 @@ class EchoRSClient
             ResultType::FLOAT => unpack('f', substr($data, 1))[1],
             ResultType::STRING => $this->interpretString($data),
             ResultType::LIST => $this->interpretList($data),
+            ResultType::LONG => unpack('P', substr($data, 1))[1]
         };
     }
 }

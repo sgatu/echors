@@ -8,6 +8,7 @@ use crate::state::{datastate::DataState, serverstate::ServerState};
 use super::implcommands::{
     delete::DeleteCmd,
     get::GetCmd,
+    hll::{hlladd::HLLAddCmd, hllcount::HLLCountCmd, hllreset::HLLResetCmd},
     incrf::IncrF,
     incri::IncrI,
     info::InfoCmd,
@@ -46,6 +47,9 @@ impl Command<'_> {
             CommandType::ListPop => LPopCmd::execute(data_state, self),
             CommandType::ListRange => LRangeCmd::execute(data_state, self),
             CommandType::ListLength => LLenCmd::execute(data_state, self),
+            CommandType::HLLAdd => HLLAddCmd::execute(data_state, self),
+            CommandType::HLLCount => HLLCountCmd::execute(data_state, self),
+            CommandType::HLLReset => HLLResetCmd::execute(data_state, self),
             _ => Err("Unknown command".to_owned()),
         }
     }
@@ -68,6 +72,9 @@ pub enum CommandType {
     ListRange,
     ListExtract,
     ListLength,
+    HLLAdd,
+    HLLCount,
+    HLLReset,
     Unknown,
 }
 impl From<[u8; 2]> for CommandType {

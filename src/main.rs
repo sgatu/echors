@@ -1,6 +1,8 @@
 mod commands;
 mod config;
+mod data;
 mod state;
+mod tests;
 
 use commands::commands::Command;
 use config::ApplicationConfig;

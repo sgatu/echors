@@ -1,6 +1,9 @@
 use dashmap::DashMap;
 use std::cmp;
 use string_builder::ToBytes;
+
+use crate::data::HLL;
+
 pub struct DataState {
     pub data: DashMap<String, DataType>,
 }
@@ -11,7 +14,7 @@ pub enum DataTypeByte {
     String = 3,
     StrList = 4,
     Map = 5,
-    HLL = 6,
+    Long = 6,
 }
 pub struct Data<T> {
     data: T,
@@ -21,6 +24,7 @@ pub type StringType = Data<Vec<u8>>;
 pub type ListType = Data<Vec<StringType>>;
 pub type IntType = Data<i32>;
 pub type FloatType = Data<f32>;
+pub type HLLType = Data<HLL>;
 
 impl IntType {
     pub fn new(num: i32) -> Self {
@@ -153,7 +157,26 @@ impl StringType {
         return &self.data;
     }
 }
-
+impl HLLType {
+    pub fn new() -> Self {
+        return Self { data: HLL::new(14) };
+    }
+    pub fn new_from_hll(hll: HLL) -> Self {
+        return Self { data: hll };
+    }
+    pub fn srlz_count(&self) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        let count = self.data.count();
+        if count < u32::MAX as u64 {
+            result.push(DataTypeByte::Integer as u8);
+            result.append(&mut u32::to_le_bytes(count as u32).to_vec());
+            return result;
+        }
+        result.push(DataTypeByte::Long as u8);
+        result.append(&mut u64::to_le_bytes(count).to_vec());
+        return result;
+    }
+}
 impl<T> Data<T> {
     pub fn get(&self) -> &T {
         return &self.data;
@@ -168,6 +191,7 @@ pub enum DataType {
     Float(FloatType),
     String(StringType),
     List(ListType),
+    HLL(HLLType),
 }
 impl DataState {
     pub fn new() -> Self {
@@ -176,8 +200,3 @@ impl DataState {
         }
     }
 }
-
-/*pub struct Data {
-    pub data: Vec<u8>,
-    pub data_type: Number;
-}*/
