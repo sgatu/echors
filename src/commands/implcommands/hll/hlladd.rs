@@ -32,10 +32,11 @@ impl HLLAddCmd {
         }
         let mut result = opt_key.unwrap();
         if let DataType::HLL(ref mut l) = result.value_mut() {
+            let mut_storage = l.get_mut();
             for i in 0..values.len() {
                 let value = std::str::from_utf8(values[i])
-                    .map_err(|_| format!("Invalid utf8 value at index {}", (i - 1)))?;
-                l.get_mut().add(value);
+                    .map_err(|_| format!("Invalid utf8 value at index {}", i))?;
+                mut_storage.add(value);
             }
             return Ok(None);
         }

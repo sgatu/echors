@@ -33,7 +33,7 @@ impl LPushCmd {
         if let DataType::List(ref mut l) = result.value_mut() {
             for i in 0..values.len() {
                 let value = std::str::from_utf8(values[i])
-                    .map_err(|_| format!("Invalid utf8 value at index {}", (i - 1)).to_owned())?;
+                    .map_err(|_| format!("Invalid utf8 value at index {}", i).to_owned())?;
                 let _ = l.push(StringType::new(value.to_owned()));
             }
             return Ok(None);
