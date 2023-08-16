@@ -56,7 +56,6 @@ class EchoRSClient
         fwrite($this->fp, $lens . $cmd);
         fflush($this->fp);
         $response = fread($this->fp, 8096);
-        var_dump(bin2hex($response));
         $result = EchoRSCommandResult::from($response[0]);
         $response = substr($response, 1);
         return [
