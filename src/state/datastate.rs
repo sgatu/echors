@@ -192,16 +192,6 @@ impl<T> Data<T> {
     pub fn get_mut(&mut self) -> &mut T {
         return &mut self.data;
     }
-    /*pub fn is_expired(&self) -> bool {
-        if self.expire.is_null() {
-            return false;
-        }
-        let current = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        self.expire.read_value() < current
-    }*/
 }
 
 pub enum DataType {
