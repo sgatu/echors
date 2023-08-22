@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType},
+    state::datastate::{DataState, DataType},
 };
 
 pub struct GetCmd {}
@@ -15,8 +15,6 @@ impl GetCmd {
             if !data_state.data.contains_key(key) {
                 Err("Key not found".to_owned())
             } else {
-                let mut delete_key = false;
-                let result_out: Result<Option<Vec<u8>>, String>;
                 //release lock
                 {
                     let result = data_state.get(key);

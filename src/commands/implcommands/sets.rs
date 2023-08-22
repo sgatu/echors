@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::{
     commands::commands::Command,
     state::{
-        datastate::{Data, DataState, DataType, DataWrapper, StringType},
-        expires::{self, ExpireParameter},
+        datastate::{DataState, DataType, DataWrapper, StringType},
+        expires::ExpireParameter,
     },
 };
 use std::mem;

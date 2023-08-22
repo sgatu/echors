@@ -3,7 +3,7 @@ use std::{
     time::SystemTime,
 };
 
-use super::datastate::{DataType, DataWrapper};
+use super::datastate::DataWrapper;
 
 pub enum ExpireParameter {
     EXPIREAT(u64),
