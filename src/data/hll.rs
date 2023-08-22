@@ -7,6 +7,7 @@ pub struct HLL {
     register_split_bits: u8,
     alpha: f64,
 }
+
 impl HLL {
     pub fn new(bucket_bits: u8) -> Self {
         // max to 15 bits -> 32768 buckets
