@@ -13,12 +13,12 @@ impl HLLResetCmd {
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
-        let opt_key = data_state.data.get_mut(key);
+        let opt_key = data_state.get_mut(key);
         if opt_key.is_none() {
             return Err("Key not found".to_owned());
         }
         let mut result = opt_key.unwrap();
-        let result_val = result.value_mut();
+        let result_val = result.value_mut().get_data_mut();
         if let DataType::HLL(list) = result_val {
             list.get_mut().reset();
             return Ok(None);

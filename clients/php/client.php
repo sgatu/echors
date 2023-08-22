@@ -35,6 +35,35 @@ enum ResultType: int
     case MAP = 5;
     case LONG = 6;
 }
+enum ExpireParamType
+{
+    case EXPIRE_AT;
+    case EXPIRE_IN;
+    case KEEP_TTL;
+    case None;
+}
+class ExpireParam
+{
+    public function __construct(private ExpireParamType $type, private ?int $value = null)
+    {
+    }
+    public function serialize()
+    {
+        switch ($this->type) {
+            case ExpireParamType::EXPIRE_AT:
+                if ($this->value == null) return "";
+                return pack('V', 8) . pack('P', $this->value);
+            case ExpireParamType::EXPIRE_IN:
+                if ($this->value == null) return "";
+                return pack('V', 4) . pack('V', $this->value);
+            case ExpireParamType::KEEP_TTL:
+                return pack('V', 1) . pack('C', 0);
+            case ExpireParamType::None:
+                return "";
+                break;
+        }
+    }
+}
 class EchoRSClient
 {
 
@@ -48,6 +77,9 @@ class EchoRSClient
         $this->fp = fsockopen("tcp://$ip", $port, $errno, $errstr);
         if (!$this->fp)
             throw new Exception("Could not connect to server");
+    }
+    private function getExpire(ExpireParamType $expType, ?int $value = null)
+    {
     }
     private function processCommand(string $cmd)
     {
@@ -63,10 +95,12 @@ class EchoRSClient
             "result" => $this->interpretValue($response)
         ];
     }
-    public function setString(string $key, string $value)
+    public function setString(string $key, string $value, ?ExpireParam $expire  = null)
     {
         $keylen = pack('V', strlen($key));
         $cmd = EchoRSCommands::SetString->value . $keylen . $key . pack('V', strlen($value)) . $value;
+        if ($expire)
+            $cmd .= $expire->serialize();
         return $this->processCommand($cmd);
     }
     public function incrementFloat(string $key, ?float $by = null)

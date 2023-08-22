@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType},
+    state::datastate::{Data, DataState, DataType, DataWrapper},
 };
 pub struct IncrF {}
 impl IncrF {
@@ -35,12 +35,12 @@ impl IncrF {
                     // we set value to incryBy if none was specified
                     data_state
                         .data
-                        .insert(key.to_owned(), DataType::Float(_data));
+                        .insert(key.to_owned(), DataWrapper::new(DataType::Float(_data)));
                 }
                 Ok(Some(response))
             } else {
                 let mut result = data_state.data.get_mut(key).unwrap();
-                let data = result.value_mut();
+                let data = result.value_mut().get_data_mut();
                 match data {
                     DataType::Float(ref mut i) => {
                         let curr_val = i.get_mut();

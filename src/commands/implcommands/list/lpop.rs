@@ -13,7 +13,7 @@ impl LPopCmd {
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
-        let opt_list = data_state.data.get_mut(key);
+        let opt_list = data_state.get_mut(key);
         if opt_list.is_none() {
             return Err("Key not found".to_owned());
         }
@@ -23,7 +23,7 @@ impl LPopCmd {
             value_count = u32::from_le_bytes([count_b[0], count_b[1], count_b[2], count_b[3]]);
         }
         let mut value_obj = opt_list.unwrap();
-        if let DataType::List(list) = value_obj.value_mut() {
+        if let DataType::List(list) = value_obj.get_data_mut() {
             let mut result: Vec<u8> = Vec::new();
             for _ in 0..value_count {
                 result.extend(list.pop().unwrap().serialize());

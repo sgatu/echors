@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{DataState, DataType},
+    state::datastate::{Data, DataState, DataType},
 };
 
 pub struct GetCmd {}
@@ -15,15 +15,25 @@ impl GetCmd {
             if !data_state.data.contains_key(key) {
                 Err("Key not found".to_owned())
             } else {
-                let result = data_state.data.get(key).unwrap();
-                let value = result.value();
-                let result = match &*value {
-                    DataType::String(v) => Ok(Some(v.serialize().to_vec())),
-                    DataType::Int(v) => Ok(Some(v.serialize().to_vec())),
-                    DataType::Float(v) => Ok(Some(v.serialize().to_vec())),
-                    _ => Err("Data type is not simple".to_owned()),
-                };
-                return result;
+                let mut delete_key = false;
+                let result_out: Result<Option<Vec<u8>>, String>;
+                //release lock
+                {
+                    let result = data_state.get(key);
+                    if let None = result {
+                        return Err("Key not found".to_owned());
+                    } else {
+                        let uresult = result.unwrap();
+                        let value = uresult.value().get_data();
+                        match &*value {
+                            DataType::String(v) => Ok(Some(v.serialize().to_vec())),
+
+                            DataType::Int(v) => Ok(Some(v.serialize().to_vec())),
+                            DataType::Float(v) => Ok(Some(v.serialize().to_vec())),
+                            _ => Err("Data type is not simple".to_owned()),
+                        }
+                    }
+                }
             }
         }
     }

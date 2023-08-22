@@ -1,11 +1,18 @@
-use dashmap::DashMap;
-use std::cmp;
+use crate::data::HLL;
+use dashmap::{
+    mapref::one::{Ref, RefMut},
+    DashMap,
+};
+use std::{
+    cmp,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use string_builder::ToBytes;
 
-use crate::data::HLL;
+use super::expires::{ExpirePtr, EXPIRE_NULL};
 
 pub struct DataState {
-    pub data: DashMap<String, DataType>,
+    pub data: DashMap<String, DataWrapper>,
 }
 #[repr(u8)]
 pub enum DataTypeByte {
@@ -153,13 +160,14 @@ impl StringType {
         asvecdata.extend(str.to_bytes().iter());
         Self { data: asvecdata }
     }
+
     pub fn serialize(&self) -> &Vec<u8> {
         return &self.data;
     }
 }
 impl HLLType {
     pub fn new() -> Self {
-        return Self { data: HLL::new(14) };
+        Self { data: HLL::new(14) }
     }
     pub fn new_from_hll(hll: HLL) -> Self {
         return Self { data: hll };
@@ -184,6 +192,16 @@ impl<T> Data<T> {
     pub fn get_mut(&mut self) -> &mut T {
         return &mut self.data;
     }
+    /*pub fn is_expired(&self) -> bool {
+        if self.expire.is_null() {
+            return false;
+        }
+        let current = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        self.expire.read_value() < current
+    }*/
 }
 
 pub enum DataType {
@@ -193,10 +211,88 @@ pub enum DataType {
     List(ListType),
     HLL(HLLType),
 }
+
 impl DataState {
     pub fn new() -> Self {
         Self {
             data: DashMap::new(),
         }
+    }
+    //this will get the value if exists and not expired, it also deletes the value if expired and returns None
+    pub fn get(&self, key: &str) -> Option<Ref<'_, String, DataWrapper>> {
+        {
+            let data = self.data.get(key);
+            if let None = data {
+                return None;
+            }
+            let wrapper = data.unwrap();
+            if !wrapper.expire.is_null() {
+                let expire_val = wrapper.expire.read_value();
+                let current = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                if expire_val > current {
+                    return Some(wrapper);
+                }
+            } else {
+                return Some(wrapper);
+            }
+        }
+        // if key exists but expire check didn't return early
+        self.data.remove(key);
+        return None;
+    }
+    //same as above but mut
+    pub fn get_mut(&self, key: &str) -> Option<RefMut<'_, String, DataWrapper>> {
+        {
+            let data = self.data.get_mut(key);
+            if let None = data {
+                return None;
+            }
+            let wrapper = data.unwrap();
+            if !wrapper.expire.is_null() {
+                let expire_val = wrapper.expire.read_value();
+                let current = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                if expire_val > current {
+                    return Some(wrapper);
+                }
+            } else {
+                return Some(wrapper);
+            }
+        }
+        // if key exists but expire check didn't return early
+        self.data.remove(key);
+        return None;
+    }
+}
+pub struct DataWrapper {
+    data: DataType,
+    expire: ExpirePtr,
+}
+impl DataWrapper {
+    pub fn new(data: DataType) -> Self {
+        Self {
+            data: data,
+            expire: EXPIRE_NULL,
+        }
+    }
+    pub fn new_with_expire(data: DataType, expire: u64) -> Self {
+        Self {
+            data: data,
+            expire: ExpirePtr::new(expire),
+        }
+    }
+    pub fn get_data_mut(&mut self) -> &mut DataType {
+        return &mut self.data;
+    }
+    pub fn get_data(&self) -> &DataType {
+        return &self.data;
+    }
+    pub fn get_expire(&self) -> &ExpirePtr {
+        return &self.expire;
     }
 }

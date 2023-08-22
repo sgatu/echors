@@ -13,12 +13,12 @@ impl LLenCmd {
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
-        let opt_list = data_state.data.get_mut(key);
+        let opt_list = data_state.get(key);
         if opt_list.is_none() {
             return Err("Key not found".to_owned());
         }
         let result = opt_list.unwrap();
-        let result_val = result.value();
+        let result_val = result.value().get_data();
         if let DataType::List(list) = result_val {
             return Ok(Some(list.srlz_len()));
         }

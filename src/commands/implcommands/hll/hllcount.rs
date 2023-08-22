@@ -13,12 +13,12 @@ impl HLLCountCmd {
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
-        let opt_key = data_state.data.get_mut(key);
+        let opt_key = data_state.data.get(key);
         if opt_key.is_none() {
             return Err("Key not found".to_owned());
         }
         let result = opt_key.unwrap();
-        let result_val = result.value();
+        let result_val = result.value().get_data();
         if let DataType::HLL(list) = result_val {
             return Ok(Some(list.srlz_count()));
         }

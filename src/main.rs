@@ -127,13 +127,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if current_connections >= app_cfg.max_connections as u32 {
                     println!("Dropping {:?} due to max_conn limitation", _addr);
-                    drop(_socket);
+                    // i think drop can be ignored, there is no next instruction, it should be dropped
+                    // drop(_socket);
                 } else {
                     {
                         let mut mut_state_data = server_state.write();
                         mut_state_data.current_connections += 1;
                         mut_state_data.total_connections += 1;
-                        drop(mut_state_data);
                     }
                     tokio::spawn(manage_socket(
                         _socket,

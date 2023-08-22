@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType},
+    state::datastate::{Data, DataState, DataType, DataWrapper},
 };
 use std::mem;
 pub struct SetI {}
@@ -24,17 +24,21 @@ impl SetI {
         ];
         let value: i32 = i32::from_le_bytes(numb);
         {
-            if !data_state.data.contains_key(key) {
-                {
-                    data_state
-                        .data
-                        .insert(key.to_owned(), DataType::Int(Data::<i32>::new(value)));
-                }
+            let current_data = data_state.get_mut(key);
+            if let Some(mut d) = current_data {
+                let data = d.value_mut();
+                let _ = mem::replace(
+                    &mut *data,
+                    DataWrapper::new(DataType::Int(Data::<i32>::new(value))),
+                );
                 Ok(None)
             } else {
-                let mut result = data_state.data.get_mut(key).unwrap();
-                let data = result.value_mut();
-                let _ = mem::replace(&mut *data, DataType::Int(Data::<i32>::new(value)));
+                {
+                    data_state.data.insert(
+                        key.to_owned(),
+                        DataWrapper::new(DataType::Int(Data::<i32>::new(value))),
+                    );
+                }
                 Ok(None)
             }
         }

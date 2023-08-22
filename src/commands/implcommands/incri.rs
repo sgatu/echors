@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType},
+    state::datastate::{Data, DataState, DataType, DataWrapper},
 };
 pub struct IncrI {}
 impl IncrI {
@@ -33,12 +33,14 @@ impl IncrI {
                     let _data = Data::<i32>::new(by);
                     response = _data.serialize().to_vec();
                     // we set value to incryBy if none was specified
-                    data_state.data.insert(key.to_owned(), DataType::Int(_data));
+                    data_state
+                        .data
+                        .insert(key.to_owned(), DataWrapper::new(DataType::Int(_data)));
                 }
                 Ok(Some(response))
             } else {
                 let mut result = data_state.data.get_mut(key).unwrap();
-                let data = result.value_mut();
+                let data = result.value_mut().get_data_mut();
                 match *data {
                     DataType::Int(ref mut i) => {
                         let curr_val = i.get_mut();
