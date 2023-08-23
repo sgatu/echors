@@ -6,12 +6,12 @@ use dashmap::{
 use rand::random;
 use std::{
     cmp,
-    sync::Arc,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use string_builder::ToBytes;
 
-use super::expires::{ExpirePtr, EXPIRE_NULL};
+use super::expires::NO_EXPIRE;
 
 pub struct DataState {
     pub data: DashMap<String, DataWrapper>,
@@ -218,13 +218,13 @@ impl DataState {
                 return None;
             }
             let wrapper = data.unwrap();
-            let expire = wrapper.get_expire().read_value();
+            let expire = wrapper.get_expire();
             if let Some(e) = expire {
                 let current = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                if e > current {
+                if e.load(Ordering::Relaxed) > current {
                     return Some(wrapper);
                 }
             } else {
@@ -248,13 +248,13 @@ impl DataState {
                 return None;
             }
             let wrapper = data.unwrap();
-            let expire = wrapper.get_expire().read_value();
+            let expire = wrapper.get_expire();
             if let Some(e) = expire {
                 let current = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                if e > current {
+                if e.load(Ordering::Relaxed) > current {
                     return Some(wrapper);
                 }
             } else {
@@ -270,17 +270,28 @@ impl DataState {
         self.data.remove(key);
         return None;
     }
+    pub fn flush(&mut self) {
+        self.data = DashMap::new();
+    }
 }
 pub struct DataWrapper {
     data: DataType,
-    expire: Arc<ExpirePtr<'static>>,
+    expire: AtomicU64,
 }
 impl DataWrapper {
-    pub fn new(data: DataType, expire: Option<Arc<ExpirePtr<'static>>>) -> Self {
-        let expire = expire.unwrap_or(EXPIRE_NULL.clone());
+    pub fn new(data: DataType, expire: Option<AtomicU64>) -> Self {
+        let exp: AtomicU64;
+        if let Some(e) = expire {
+            exp = (e.load(Ordering::Relaxed) == 0)
+                .then_some(NO_EXPIRE)
+                .unwrap_or(e);
+        } else {
+            exp = NO_EXPIRE;
+        }
+
         Self {
             data: data,
-            expire: expire,
+            expire: exp,
         }
     }
     pub fn get_data_mut(&mut self) -> &mut DataType {
@@ -289,7 +300,11 @@ impl DataWrapper {
     pub fn get_data(&self) -> &DataType {
         return &self.data;
     }
-    pub fn get_expire(&self) -> &ExpirePtr {
-        return &self.expire;
+    pub fn get_expire(&self) -> Option<&AtomicU64> {
+        if self.expire.load(Ordering::Relaxed) == 0 {
+            None
+        } else {
+            Some(&self.expire)
+        }
     }
 }

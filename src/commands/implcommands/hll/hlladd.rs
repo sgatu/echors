@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::{
     commands::commands::Command,
     data::HLL,
@@ -8,14 +10,18 @@ use crate::{
 
 pub struct HLLAddCmd {}
 impl HLLAddCmd {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 2 {
             return Err("Invalid number of arguments for HLLADD command".to_owned());
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
         let values = cmd.arguments.split_at(1).1;
-        let opt_key = data_state.get_mut(key);
+        let rlock = data_state.read();
+        let opt_key = rlock.get_mut(key);
         if opt_key.is_none() {
             let mut hll: HLL = HLL::new(14);
 
@@ -25,7 +31,7 @@ impl HLLAddCmd {
                         .map_err(|_| format!("Invalid utf8 value at index {}", i).to_owned())?,
                 );
             }
-            data_state.data.insert(
+            data_state.read().data.insert(
                 key.to_owned(),
                 DataWrapper::new(DataType::HLL(HLLType::new_from_hll(hll)), None),
             );

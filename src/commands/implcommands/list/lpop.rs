@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::{
     commands::commands::Command,
     state::datastate::{DataState, DataType},
@@ -7,13 +9,17 @@ use crate::{
 
 pub struct LPopCmd {}
 impl LPopCmd {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 1 {
             return Err("Invalid number of arguments for LPOP command".to_owned());
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
-        let opt_list = data_state.get_mut(key);
+        let rlock = data_state.read();
+        let opt_list = rlock.get_mut(key);
         if opt_list.is_none() {
             return Err("Key not found".to_owned());
         }

@@ -1,17 +1,22 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
+
+use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
     state::{
         datastate::{DataState, DataType, DataWrapper, StringType},
-        expires::{ExpireParameter, ExpirePtr},
+        expires::ExpireParameter,
     },
 };
 use std::mem;
 
 pub struct SetSCmd {}
 impl SetSCmd {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 2 {
             return Err("Invalid number of arguments for SETS command".to_owned());
         }
@@ -29,7 +34,8 @@ impl SetSCmd {
         let value =
             std::str::from_utf8(cmd.arguments[1]).map_err(|_| "Invalid utf8 value".to_owned())?;
         {
-            let current_data = data_state.data.get_mut(key);
+            let rlock = data_state.read();
+            let current_data = rlock.get_mut(key);
             if let Some(mut d) = current_data {
                 let new_expire = expire.get_expire(Some(d.value()));
                 let data = d.value_mut();
@@ -38,7 +44,7 @@ impl SetSCmd {
                     |exp_u64| {
                         DataWrapper::new(
                             DataType::String(StringType::new(value.to_owned())),
-                            Some(Arc::new(ExpirePtr::newc(&exp_u64 as *const u64))),
+                            Some(AtomicU64::new(exp_u64)),
                         )
                     },
                 );
@@ -51,11 +57,11 @@ impl SetSCmd {
                     |exp_u64| {
                         DataWrapper::new(
                             DataType::String(StringType::new(value.to_owned())),
-                            Some(Arc::new(ExpirePtr::new(exp_u64))),
+                            Some(AtomicU64::new(exp_u64)),
                         )
                     },
                 );
-                data_state.data.insert(key.to_owned(), new_data);
+                data_state.read().data.insert(key.to_owned(), new_data);
                 Ok(None)
             }
         }

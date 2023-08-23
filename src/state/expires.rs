@@ -1,4 +1,11 @@
-use std::{marker::PhantomData, sync::Arc, time::SystemTime};
+use std::{
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::SystemTime,
+};
 
 use lazy_static::lazy_static;
 
@@ -35,7 +42,7 @@ impl ExpireParameter {
             }
             ExpireParameter::KEEPTTL => {
                 if let Some(data) = old_data {
-                    return data.get_expire().read_value();
+                    return Some(data.get_expire().unwrap().load(Ordering::Relaxed));
                 } else {
                     None
                 }
@@ -45,35 +52,4 @@ impl ExpireParameter {
         return out;
     }
 }
-//value does not matter, just initialization, 0 is just ok as any other value
-pub struct ExpirePtr<'a> {
-    ptr: *const u64,
-    phantom: PhantomData<&'a u64>,
-}
-impl<'a> ExpirePtr<'a> {
-    pub fn new(exp: u64) -> Self {
-        Self {
-            ptr: exp as *const u64,
-            phantom: PhantomData,
-        }
-    }
-    pub fn newc(exp: *const u64) -> Self {
-        Self {
-            ptr: exp,
-            phantom: PhantomData,
-        }
-    }
-    pub fn read_value(&self) -> Option<u64> {
-        if self.ptr.is_null() {
-            return None;
-        }
-        return Some(unsafe { *self.ptr });
-    }
-}
-lazy_static! {
-    pub static ref EXPIRE_NULL: Arc<ExpirePtr<'static>> =
-        Arc::new(ExpirePtr::newc(std::ptr::null()));
-}
-
-unsafe impl<'a> Send for ExpirePtr<'a> {}
-unsafe impl<'a> Sync for ExpirePtr<'a> {}
+pub const NO_EXPIRE: AtomicU64 = AtomicU64::new(0);

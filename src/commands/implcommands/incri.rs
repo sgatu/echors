@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::{
     commands::commands::Command,
     state::datastate::{Data, DataState, DataType, DataWrapper},
 };
 pub struct IncrI {}
 impl IncrI {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 1 {
             return Err("Invalid number of arguments for INCRI command".to_owned());
         }
@@ -28,18 +33,20 @@ impl IncrI {
 
         {
             let response: Vec<u8>;
-            if !data_state.data.contains_key(key) {
+            if !data_state.read().data.contains_key(key) {
                 {
                     let _data = Data::<i32>::new(by);
                     response = _data.serialize().to_vec();
                     // we set value to incryBy if none was specified
                     data_state
+                        .read()
                         .data
                         .insert(key.to_owned(), DataWrapper::new(DataType::Int(_data), None));
                 }
                 Ok(Some(response))
             } else {
-                let mut result = data_state.data.get_mut(key).unwrap();
+                let rlock = data_state.read();
+                let mut result = rlock.get_mut(key).unwrap();
                 let data = result.value_mut().get_data_mut();
                 match *data {
                     DataType::Int(ref mut i) => {

@@ -15,7 +15,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::state::serverstate::ServerState;
+use crate::{commands::commands::CommandType, state::serverstate::ServerState};
 use crate::{commands::parser::Parser, state::datastate::DataTypeByte};
 #[repr(u8)]
 pub enum CommandResult {
@@ -25,7 +25,7 @@ pub enum CommandResult {
 async fn manage_socket(
     mut socket: TcpStream,
     server_state: Arc<RwLock<ServerState>>,
-    data_state: Arc<DataState>,
+    data_state: Arc<RwLock<DataState>>,
 ) {
     let socket_addr = socket.peer_addr().unwrap();
     println!("Client {} connected.", socket_addr);
@@ -52,18 +52,28 @@ async fn manage_socket(
         let command_result = Parser::parse(&next_buff);
         let mut response: Vec<u8> = Vec::new();
         match command_result {
-            Ok(cmd) => match process_cmd(&cmd, &server_state, &data_state).await {
-                Ok(data) => {
+            Ok(cmd) => {
+                if let CommandType::Flush = cmd.command_type {
+                    data_state.write().flush();
                     response.push(CommandResult::OK as u8);
-                    response.append(&mut (data.to_vec()));
-                }
-                Err(message) => {
-                    response.push(CommandResult::ERR as u8);
                     response.push(DataTypeByte::String as u8);
-                    response.append(&mut u32::to_le_bytes(message.len() as u32).to_vec());
-                    response.append(&mut message.as_bytes().to_vec());
+                    response.append(&mut u32::to_le_bytes(2 as u32).to_vec());
+                    response.append(&mut "OK".as_bytes().to_vec());
+                } else {
+                    match process_cmd(&cmd, &server_state, &data_state).await {
+                        Ok(data) => {
+                            response.push(CommandResult::OK as u8);
+                            response.append(&mut (data.to_vec()));
+                        }
+                        Err(message) => {
+                            response.push(CommandResult::ERR as u8);
+                            response.push(DataTypeByte::String as u8);
+                            response.append(&mut u32::to_le_bytes(message.len() as u32).to_vec());
+                            response.append(&mut message.as_bytes().to_vec());
+                        }
+                    }
                 }
-            },
+            }
             Err(()) => {
                 let err_msg = "Could not process command";
                 response.push(CommandResult::ERR as u8);
@@ -88,7 +98,7 @@ async fn manage_socket(
 async fn process_cmd<'a>(
     cmd: &Command<'_>,
     server_state: &Arc<RwLock<ServerState>>,
-    data_state: &Arc<DataState>,
+    data_state: &Arc<RwLock<DataState>>,
 ) -> Result<Vec<u8>, String> {
     let result = cmd.execute(data_state, server_state);
     if !result.is_err() {
@@ -112,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_cfg: ApplicationConfig =
         ApplicationConfig::from_config_file(PathBuf::from("./echors.toml")).unwrap();
     let server_state = Arc::new(RwLock::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
-    let data_state = Arc::new(DataState::new());
+    let data_state = Arc::new(RwLock::new(DataState::new()));
     println!("Starting server. Binding on: {}", &app_cfg.bind);
     let listener: TcpListener = TcpListener::bind(&app_cfg.bind).await?;
     //let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));

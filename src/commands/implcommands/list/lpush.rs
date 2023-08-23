@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::{
     commands::commands::Command,
     state::datastate::{DataState, DataType, DataWrapper, ListType, StringType},
@@ -7,14 +9,18 @@ use crate::{
 
 pub struct LPushCmd {}
 impl LPushCmd {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 2 {
             return Err("Invalid number of arguments for LPUSH command".to_owned());
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
         let values = cmd.arguments.split_at(1).1;
-        let opt_key = data_state.get_mut(key);
+        let rlock = data_state.read();
+        let opt_key = rlock.get_mut(key);
         if opt_key.is_none() {
             let mut vec_values: Vec<String> = Vec::new();
             for i in 0..values.len() {
@@ -24,7 +30,7 @@ impl LPushCmd {
                         .to_owned(),
                 );
             }
-            data_state.data.insert(
+            data_state.read().data.insert(
                 key.to_owned(),
                 DataWrapper::new(DataType::List(ListType::new(vec_values)), None),
             );

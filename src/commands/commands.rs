@@ -29,7 +29,7 @@ pub struct Command<'a> {
 impl Command<'_> {
     pub fn execute<'a>(
         self: &Self,
-        data_state: &Arc<DataState>,
+        data_state: &Arc<RwLock<DataState>>,
         server_state_rwl: &Arc<RwLock<ServerState>>,
     ) -> Result<Option<Vec<u8>>, String> {
         match self.command_type {
@@ -75,6 +75,7 @@ pub enum CommandType {
     HLLAdd,
     HLLCount,
     HLLReset,
+    Flush,
     Unknown,
 }
 impl From<[u8; 2]> for CommandType {

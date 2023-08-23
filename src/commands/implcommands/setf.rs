@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use parking_lot::RwLock;
+
 use crate::{
     commands::commands::Command,
     state::datastate::{Data, DataState, DataType, DataWrapper},
@@ -7,7 +9,10 @@ use crate::{
 use std::mem;
 pub struct SetF {}
 impl SetF {
-    pub fn execute(data_state: &Arc<DataState>, cmd: &Command) -> Result<Option<Vec<u8>>, String> {
+    pub fn execute(
+        data_state: &Arc<RwLock<DataState>>,
+        cmd: &Command,
+    ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() != 2 {
             return Err("Invalid number of arguments for SETF command".to_owned());
         }
@@ -24,7 +29,8 @@ impl SetF {
         ];
         let value: f32 = f32::from_le_bytes(numb);
         {
-            let current_data = data_state.get_mut(key);
+            let rlock = data_state.read();
+            let current_data = rlock.get_mut(key);
             if let Some(mut d) = current_data {
                 let data = d.value_mut();
                 let _ = mem::replace(
@@ -33,7 +39,7 @@ impl SetF {
                 );
                 Ok(None)
             } else {
-                data_state.data.insert(
+                data_state.read().data.insert(
                     key.to_owned(),
                     DataWrapper::new(DataType::Float(Data::<f32>::new(value)), None),
                 );
