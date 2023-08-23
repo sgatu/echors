@@ -26,7 +26,7 @@ impl LPushCmd {
             }
             data_state.data.insert(
                 key.to_owned(),
-                DataWrapper::new(DataType::List(ListType::new(vec_values))),
+                DataWrapper::new(DataType::List(ListType::new(vec_values)), None),
             );
             return Ok(None);
         }

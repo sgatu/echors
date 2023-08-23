@@ -1,7 +1,6 @@
-use std::{
-    sync::atomic::{AtomicU64, Ordering},
-    time::SystemTime,
-};
+use std::{marker::PhantomData, sync::Arc, time::SystemTime};
+
+use lazy_static::lazy_static;
 
 use super::datastate::DataWrapper;
 
@@ -36,13 +35,7 @@ impl ExpireParameter {
             }
             ExpireParameter::KEEPTTL => {
                 if let Some(data) = old_data {
-                    let expire = data.get_expire();
-                    if expire.isnull {
-                        None
-                    } else {
-                        let time = expire.ptr.load(Ordering::Relaxed);
-                        Some(time)
-                    }
+                    return data.get_expire().read_value();
                 } else {
                     None
                 }
@@ -53,34 +46,34 @@ impl ExpireParameter {
     }
 }
 //value does not matter, just initialization, 0 is just ok as any other value
-const NULL_PTR: AtomicU64 = AtomicU64::new(0);
-pub struct ExpirePtr {
-    ptr: AtomicU64,
-    isnull: bool,
+pub struct ExpirePtr<'a> {
+    ptr: *const u64,
+    phantom: PhantomData<&'a u64>,
 }
-
-impl ExpirePtr {
+impl<'a> ExpirePtr<'a> {
     pub fn new(exp: u64) -> Self {
         Self {
-            ptr: AtomicU64::new(exp),
-            isnull: false,
+            ptr: exp as *const u64,
+            phantom: PhantomData,
         }
     }
-    pub fn is_null(&self) -> bool {
-        return self.isnull;
-    }
-    pub fn read_value(&self) -> u64 {
-        return self.ptr.load(Ordering::Relaxed);
-    }
-    //keep it private so it's singleton-ish
-    const fn null_new() -> Self {
+    pub fn newc(exp: *const u64) -> Self {
         Self {
-            ptr: NULL_PTR,
-            isnull: true,
+            ptr: exp,
+            phantom: PhantomData,
         }
+    }
+    pub fn read_value(&self) -> Option<u64> {
+        if self.ptr.is_null() {
+            return None;
+        }
+        return Some(unsafe { *self.ptr });
     }
 }
-pub const EXPIRE_NULL: ExpirePtr = ExpirePtr::null_new();
-//bit crazy, maybe, but it's supposed that EXPIRE_NULL is const so it won't change, and others will be behind lock
-unsafe impl Send for ExpirePtr {}
-unsafe impl Sync for ExpirePtr {}
+lazy_static! {
+    pub static ref EXPIRE_NULL: Arc<ExpirePtr<'static>> =
+        Arc::new(ExpirePtr::newc(std::ptr::null()));
+}
+
+unsafe impl<'a> Send for ExpirePtr<'a> {}
+unsafe impl<'a> Sync for ExpirePtr<'a> {}

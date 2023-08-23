@@ -29,13 +29,13 @@ impl SetF {
                 let data = d.value_mut();
                 let _ = mem::replace(
                     &mut *data,
-                    DataWrapper::new(DataType::Float(Data::<f32>::new(value))),
+                    DataWrapper::new(DataType::Float(Data::<f32>::new(value)), None),
                 );
                 Ok(None)
             } else {
                 data_state.data.insert(
                     key.to_owned(),
-                    DataWrapper::new(DataType::Float(Data::<f32>::new(value))),
+                    DataWrapper::new(DataType::Float(Data::<f32>::new(value)), None),
                 );
                 Ok(None)
             }

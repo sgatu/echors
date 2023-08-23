@@ -33,9 +33,10 @@ impl IncrF {
                     let _data = Data::<f32>::new(by);
                     response = _data.serialize().to_vec();
                     // we set value to incryBy if none was specified
-                    data_state
-                        .data
-                        .insert(key.to_owned(), DataWrapper::new(DataType::Float(_data)));
+                    data_state.data.insert(
+                        key.to_owned(),
+                        DataWrapper::new(DataType::Float(_data), None),
+                    );
                 }
                 Ok(Some(response))
             } else {

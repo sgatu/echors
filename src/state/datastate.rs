@@ -3,8 +3,10 @@ use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
+use rand::random;
 use std::{
     cmp,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use string_builder::ToBytes;
@@ -216,18 +218,23 @@ impl DataState {
                 return None;
             }
             let wrapper = data.unwrap();
-            if !wrapper.expire.is_null() {
-                let expire_val = wrapper.expire.read_value();
+            let expire = wrapper.get_expire().read_value();
+            if let Some(e) = expire {
                 let current = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                if expire_val > current {
+                if e > current {
                     return Some(wrapper);
                 }
             } else {
                 return Some(wrapper);
             }
+        }
+        let r = random::<u8>();
+        if r < 2 || self.data.len() == 0 {
+            println!("Shrinking...currLen: {}", self.data.len());
+            self.data.shrink_to_fit();
         }
         // if key exists but expire check didn't return early
         self.data.remove(key);
@@ -241,13 +248,13 @@ impl DataState {
                 return None;
             }
             let wrapper = data.unwrap();
-            if !wrapper.expire.is_null() {
-                let expire_val = wrapper.expire.read_value();
+            let expire = wrapper.get_expire().read_value();
+            if let Some(e) = expire {
                 let current = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                if expire_val > current {
+                if e > current {
                     return Some(wrapper);
                 }
             } else {
@@ -255,25 +262,25 @@ impl DataState {
             }
         }
         // if key exists but expire check didn't return early
+        let r = random::<u8>();
+        if r < 2 || self.data.len() == 0 {
+            println!("Shrinking...currLen: {}", self.data.len());
+            self.data.shrink_to_fit();
+        }
         self.data.remove(key);
         return None;
     }
 }
 pub struct DataWrapper {
     data: DataType,
-    expire: ExpirePtr,
+    expire: Arc<ExpirePtr<'static>>,
 }
 impl DataWrapper {
-    pub fn new(data: DataType) -> Self {
+    pub fn new(data: DataType, expire: Option<Arc<ExpirePtr<'static>>>) -> Self {
+        let expire = expire.unwrap_or(EXPIRE_NULL.clone());
         Self {
             data: data,
-            expire: EXPIRE_NULL,
-        }
-    }
-    pub fn new_with_expire(data: DataType, expire: u64) -> Self {
-        Self {
-            data: data,
-            expire: ExpirePtr::new(expire),
+            expire: expire,
         }
     }
     pub fn get_data_mut(&mut self) -> &mut DataType {

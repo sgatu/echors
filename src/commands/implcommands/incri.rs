@@ -35,7 +35,7 @@ impl IncrI {
                     // we set value to incryBy if none was specified
                     data_state
                         .data
-                        .insert(key.to_owned(), DataWrapper::new(DataType::Int(_data)));
+                        .insert(key.to_owned(), DataWrapper::new(DataType::Int(_data), None));
                 }
                 Ok(Some(response))
             } else {

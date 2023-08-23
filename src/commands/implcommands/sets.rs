@@ -4,7 +4,7 @@ use crate::{
     commands::commands::Command,
     state::{
         datastate::{DataState, DataType, DataWrapper, StringType},
-        expires::ExpireParameter,
+        expires::{ExpireParameter, ExpirePtr},
     },
 };
 use std::mem;
@@ -34,11 +34,11 @@ impl SetSCmd {
                 let new_expire = expire.get_expire(Some(d.value()));
                 let data = d.value_mut();
                 let new_data = new_expire.map_or_else(
-                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned()))),
+                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned())), None),
                     |exp_u64| {
-                        DataWrapper::new_with_expire(
+                        DataWrapper::new(
                             DataType::String(StringType::new(value.to_owned())),
-                            exp_u64,
+                            Some(Arc::new(ExpirePtr::newc(&exp_u64 as *const u64))),
                         )
                     },
                 );
@@ -47,11 +47,11 @@ impl SetSCmd {
             } else {
                 let new_expire = expire.get_expire(None);
                 let new_data = new_expire.map_or_else(
-                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned()))),
+                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned())), None),
                     |exp_u64| {
-                        DataWrapper::new_with_expire(
+                        DataWrapper::new(
                             DataType::String(StringType::new(value.to_owned())),
-                            exp_u64,
+                            Some(Arc::new(ExpirePtr::new(exp_u64))),
                         )
                     },
                 );

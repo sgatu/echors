@@ -27,7 +27,7 @@ impl HLLAddCmd {
             }
             data_state.data.insert(
                 key.to_owned(),
-                DataWrapper::new(DataType::HLL(HLLType::new_from_hll(hll))),
+                DataWrapper::new(DataType::HLL(HLLType::new_from_hll(hll)), None),
             );
             return Ok(None);
         }
