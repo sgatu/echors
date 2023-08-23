@@ -1,13 +1,7 @@
 use std::{
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
     time::SystemTime,
 };
-
-use lazy_static::lazy_static;
 
 use super::datastate::DataWrapper;
 
