@@ -4,9 +4,11 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType, DataWrapper},
+    state::{
+        datastate::{Data, DataState, DataType},
+        expires::ExpireParameter,
+    },
 };
-use std::mem;
 pub struct SetF {}
 impl SetF {
     pub fn execute(
@@ -30,21 +32,12 @@ impl SetF {
         let value: f32 = f32::from_le_bytes(numb);
         {
             let rlock = data_state.read();
-            let current_data = rlock.get_mut(key);
-            if let Some(mut d) = current_data {
-                let data = d.value_mut();
-                let _ = mem::replace(
-                    &mut *data,
-                    DataWrapper::new(DataType::Float(Data::<f32>::new(value)), None),
-                );
-                Ok(None)
-            } else {
-                data_state.read().data.insert(
-                    key.to_owned(),
-                    DataWrapper::new(DataType::Float(Data::<f32>::new(value)), None),
-                );
-                Ok(None)
-            }
+            let _ = rlock.set(
+                key,
+                DataType::Float(Data::<f32>::new(value)),
+                ExpireParameter::None,
+            );
+            Ok(None)
         }
     }
 }

@@ -1,15 +1,14 @@
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::Arc;
 
 use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
     state::{
-        datastate::{DataState, DataType, DataWrapper, StringType},
+        datastate::{DataState, DataType, StringType},
         expires::ExpireParameter,
     },
 };
-use std::mem;
 
 pub struct SetSCmd {}
 impl SetSCmd {
@@ -35,35 +34,12 @@ impl SetSCmd {
             std::str::from_utf8(cmd.arguments[1]).map_err(|_| "Invalid utf8 value".to_owned())?;
         {
             let rlock = data_state.read();
-            let current_data = rlock.get_mut(key);
-            if let Some(mut d) = current_data {
-                let new_expire = expire.get_expire(Some(d.value()));
-                let data = d.value_mut();
-                let new_data = new_expire.map_or_else(
-                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned())), None),
-                    |exp_u64| {
-                        DataWrapper::new(
-                            DataType::String(StringType::new(value.to_owned())),
-                            Some(AtomicU64::new(exp_u64)),
-                        )
-                    },
-                );
-                let _ = mem::replace(&mut *data, new_data);
-                Ok(None)
-            } else {
-                let new_expire = expire.get_expire(None);
-                let new_data = new_expire.map_or_else(
-                    || DataWrapper::new(DataType::String(StringType::new(value.to_owned())), None),
-                    |exp_u64| {
-                        DataWrapper::new(
-                            DataType::String(StringType::new(value.to_owned())),
-                            Some(AtomicU64::new(exp_u64)),
-                        )
-                    },
-                );
-                data_state.read().data.insert(key.to_owned(), new_data);
-                Ok(None)
-            }
+            let _ = rlock.set(
+                key,
+                DataType::String(StringType::new(value.to_owned())),
+                expire,
+            );
+            Ok(None)
         }
     }
 }

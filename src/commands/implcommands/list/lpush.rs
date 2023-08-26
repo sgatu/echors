@@ -4,7 +4,10 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{DataState, DataType, DataWrapper, ListType, StringType},
+    state::{
+        datastate::{DataState, DataType, ListType, StringType},
+        expires::ExpireParameter,
+    },
 };
 
 pub struct LPushCmd {}
@@ -30,9 +33,10 @@ impl LPushCmd {
                         .to_owned(),
                 );
             }
-            data_state.read().data.insert(
-                key.to_owned(),
-                DataWrapper::new(DataType::List(ListType::new(vec_values)), None),
+            let _ = data_state.read().set(
+                key,
+                DataType::List(ListType::new(vec_values)),
+                ExpireParameter::None,
             );
             return Ok(None);
         }

@@ -5,13 +5,13 @@ use dashmap::{
 };
 use rand::random;
 use std::{
-    cmp,
+    cmp, mem,
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use string_builder::ToBytes;
 
-use super::expires::NO_EXPIRE;
+use super::expires::{ExpireParameter, NO_EXPIRE};
 
 pub struct DataState {
     pub data: DashMap<String, DataWrapper>,
@@ -239,6 +239,27 @@ impl DataState {
         // if key exists but expire check didn't return early
         self.data.remove(key);
         return None;
+    }
+    pub fn set(&self, key: &str, value: DataType, expire: ExpireParameter) -> Result<(), ()> {
+        let current_data = self.get_mut(key);
+
+        if let Some(mut d) = current_data {
+            let new_expire = expire.calc_new_expire(Some(&*d));
+            let data = DataWrapper::new(
+                value,
+                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
+            );
+            let _ = mem::replace(&mut *d, data);
+            Ok(())
+        } else {
+            let new_expire = expire.calc_new_expire(None);
+            let data = DataWrapper::new(
+                value,
+                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
+            );
+            self.data.insert(key.to_owned(), data);
+            Ok(())
+        }
     }
     //same as above but mut
     pub fn get_mut(&self, key: &str) -> Option<RefMut<'_, String, DataWrapper>> {

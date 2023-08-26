@@ -5,7 +5,10 @@ use parking_lot::RwLock;
 use crate::{
     commands::commands::Command,
     data::HLL,
-    state::datastate::{DataState, DataType, DataWrapper, HLLType},
+    state::{
+        datastate::{DataState, DataType, HLLType},
+        expires::ExpireParameter,
+    },
 };
 
 pub struct HLLAddCmd {}
@@ -31,9 +34,10 @@ impl HLLAddCmd {
                         .map_err(|_| format!("Invalid utf8 value at index {}", i).to_owned())?,
                 );
             }
-            data_state.read().data.insert(
-                key.to_owned(),
-                DataWrapper::new(DataType::HLL(HLLType::new_from_hll(hll)), None),
+            let _ = data_state.read().set(
+                key,
+                DataType::HLL(HLLType::new_from_hll(hll)),
+                ExpireParameter::None,
             );
             return Ok(None);
         }

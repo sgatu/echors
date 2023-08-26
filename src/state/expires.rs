@@ -24,7 +24,7 @@ impl ExpireParameter {
             _ => ExpireParameter::None,
         }
     }
-    pub fn get_expire(&self, old_data: Option<&DataWrapper>) -> Option<u64> {
+    pub fn calc_new_expire(&self, old_data: Option<&DataWrapper>) -> Option<u64> {
         let out = match self {
             ExpireParameter::EXPIREAT(eat) => Some(*eat),
             ExpireParameter::EXPIREIN(ein) => {

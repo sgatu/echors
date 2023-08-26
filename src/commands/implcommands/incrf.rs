@@ -4,7 +4,10 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType, DataWrapper},
+    state::{
+        datastate::{Data, DataState, DataType},
+        expires::ExpireParameter,
+    },
 };
 pub struct IncrF {}
 impl IncrF {
@@ -20,7 +23,7 @@ impl IncrF {
         let mut by: f32 = 1.0;
         if cmd.arguments.len() > 1 {
             if cmd.arguments[1].len() < 4 {
-                return Err("Invalid u32 value".to_owned());
+                return Err("Invalid f32 value".to_owned());
             }
             let by_b: [u8; 4] = [
                 (*cmd.arguments[1])[0],
@@ -31,34 +34,27 @@ impl IncrF {
             by = f32::from_le_bytes(by_b);
         }
 
+        let response: Vec<u8>;
         {
-            let response: Vec<u8>;
-            if !data_state.read().data.contains_key(key) {
-                {
-                    let _data = Data::<f32>::new(by);
-                    response = _data.serialize().to_vec();
-                    // we set value to incryBy if none was specified
-                    data_state.read().data.insert(
-                        key.to_owned(),
-                        DataWrapper::new(DataType::Float(_data), None),
-                    );
-                }
-                Ok(Some(response))
-            } else {
-                let rlock = data_state.read();
-                let mut result = rlock.get_mut(key).unwrap();
-                let data = result.value_mut().get_data_mut();
-                match data {
-                    DataType::Float(ref mut i) => {
-                        let curr_val = i.get_mut();
+            let rlock = data_state.read();
+            let old_data = rlock.get_mut(key);
+            if let Some(mut d) = old_data {
+                let data = d.value_mut().get_data_mut();
+                match *data {
+                    DataType::Float(ref mut f) => {
+                        let curr_val = f.get_mut();
                         *curr_val += by;
-                        response = i.serialize().to_vec();
+                        response = f.serialize().to_vec();
                     }
 
                     _ => return Err("Invalid type".to_owned()),
                 };
-                Ok(Some(response))
+            } else {
+                let _data = Data::<f32>::new(by);
+                response = _data.serialize().to_vec();
+                let _ = rlock.set(key, DataType::Float(_data), ExpireParameter::None);
             }
         }
+        Ok(Some(response))
     }
 }
