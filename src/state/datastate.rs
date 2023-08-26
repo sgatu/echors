@@ -231,8 +231,8 @@ impl DataState {
                 return Some(wrapper);
             }
         }
-        let r = random::<u8>();
-        if r < 2 || self.data.len() == 0 {
+        let r = random::<u16>();
+        if r < 20 || self.data.len() == 0 {
             println!("Shrinking...currLen: {}", self.data.len());
             self.data.shrink_to_fit();
         }

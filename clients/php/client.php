@@ -19,7 +19,8 @@ enum EchoRSCommands: string
     case HLLAdd = "\x0e\x00";
     case HLLCount = "\x0f\x00";
     case HLLReset = "\x10\x00";
-    case Unknown = "\x11\x00";
+    case FLUSH = "\x11\x00";
+    case Unknown = "\x12\x00";
 }
 enum EchoRSCommandResult: string
 {
@@ -187,6 +188,11 @@ class EchoRSClient
     {
         $keylen = pack('V', strlen($key));
         $cmd = EchoRSCommands::HLLCount->value . $keylen . $key;
+        return $this->processCommand($cmd);
+    }
+    public function flush()
+    {
+        $cmd = EchoRSCommands::FLUSH->value;
         return $this->processCommand($cmd);
     }
     public function hllReset(string $key)

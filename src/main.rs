@@ -17,6 +17,14 @@ use tokio::{
 
 use crate::{commands::commands::CommandType, state::serverstate::ServerState};
 use crate::{commands::parser::Parser, state::datastate::DataTypeByte};
+
+#[cfg(not(target_env = "msvc"))]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 #[repr(u8)]
 pub enum CommandResult {
     OK = 1,
@@ -34,7 +42,6 @@ async fn manage_socket(
             Ok(n) => n,
             Err(e) => break format!("failed to read from socket; err = {:?}", e),
         } as usize;
-
         let mut next_buff: Vec<u8> = vec![0; buf_len];
         let _ = match socket.read(&mut next_buff).await {
             // socket closed
