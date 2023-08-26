@@ -28,7 +28,7 @@ impl GetCmd {
                         return Err("Key not found".to_owned());
                     } else {
                         let uresult = result.unwrap();
-                        let value = uresult.value().get_data();
+                        let value = uresult.value();
                         match &*value {
                             DataType::String(v) => Ok(Some(v.serialize().to_vec())),
 

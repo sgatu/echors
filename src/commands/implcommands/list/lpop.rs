@@ -28,8 +28,9 @@ impl LPopCmd {
             let count_b = cmd.arguments.get(1).unwrap();
             value_count = u32::from_le_bytes([count_b[0], count_b[1], count_b[2], count_b[3]]);
         }
-        let mut value_obj = opt_list.unwrap();
-        if let DataType::List(list) = value_obj.get_data_mut() {
+        let mut opt_list_u = opt_list.unwrap();
+        let value_obj = opt_list_u.value_mut();
+        if let DataType::List(list) = value_obj {
             let mut result: Vec<u8> = Vec::new();
             for _ in 0..value_count {
                 result.extend(list.pop().unwrap().serialize());

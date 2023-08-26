@@ -25,7 +25,7 @@ impl LLenCmd {
             return Err("Key not found".to_owned());
         }
         let result = opt_list.unwrap();
-        let result_val = result.value().get_data();
+        let result_val = result.value();
         if let DataType::List(list) = result_val {
             return Ok(Some(list.srlz_len()));
         }

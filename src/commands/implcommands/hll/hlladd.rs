@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use crate::{
     commands::commands::Command,
     data::HLL,
-    state::datastate::{DataState, DataType, DataWrapper, HLLType},
+    state::datastate::{DataState, DataType, HLLType},
 };
 
 pub struct HLLAddCmd {}
@@ -31,14 +31,14 @@ impl HLLAddCmd {
                         .map_err(|_| format!("Invalid utf8 value at index {}", i).to_owned())?,
                 );
             }
-            data_state.read().data.insert(
-                key.to_owned(),
-                DataWrapper::new(DataType::HLL(HLLType::new_from_hll(hll)), None),
-            );
+            data_state
+                .read()
+                .data
+                .insert(key.to_owned(), DataType::HLL(HLLType::new_from_hll(hll)));
             return Ok(None);
         }
         let mut result = opt_key.unwrap();
-        if let DataType::HLL(ref mut l) = result.value_mut().get_data_mut() {
+        if let DataType::HLL(ref mut l) = result.value_mut() {
             let mut_storage = l.get_mut();
             for i in 0..values.len() {
                 let value = std::str::from_utf8(values[i])

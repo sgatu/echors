@@ -4,7 +4,7 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{Data, DataState, DataType, DataWrapper},
+    state::datastate::{Data, DataState, DataType},
 };
 pub struct IncrF {}
 impl IncrF {
@@ -13,7 +13,7 @@ impl IncrF {
         cmd: &Command,
     ) -> Result<Option<Vec<u8>>, String> {
         if cmd.arguments.len() < 1 {
-            return Err("Invalid number of arguments for INCRI command".to_owned());
+            return Err("Invalid number of arguments for INCRF command".to_owned());
         }
         let key =
             std::str::from_utf8(cmd.arguments[0]).map_err(|_| "Invalid utf8 key".to_owned())?;
@@ -30,35 +30,31 @@ impl IncrF {
             ];
             by = f32::from_le_bytes(by_b);
         }
-
-        {
-            let response: Vec<u8>;
-            if !data_state.read().data.contains_key(key) {
-                {
-                    let _data = Data::<f32>::new(by);
-                    response = _data.serialize().to_vec();
-                    // we set value to incryBy if none was specified
-                    data_state.read().data.insert(
-                        key.to_owned(),
-                        DataWrapper::new(DataType::Float(_data), None),
-                    );
+        let response: Vec<u8>;
+        let rlock = data_state.read();
+        let current_data = rlock.get_mut(key);
+        if let Some(mut d) = current_data {
+            let data = d.value_mut();
+            match *data {
+                DataType::Float(ref mut f) => {
+                    let curr_val = f.get_mut();
+                    *curr_val += by;
+                    response = f.serialize().to_vec();
                 }
-                Ok(Some(response))
-            } else {
-                let rlock = data_state.read();
-                let mut result = rlock.get_mut(key).unwrap();
-                let data = result.value_mut().get_data_mut();
-                match data {
-                    DataType::Float(ref mut i) => {
-                        let curr_val = i.get_mut();
-                        *curr_val += by;
-                        response = i.serialize().to_vec();
-                    }
 
-                    _ => return Err("Invalid type".to_owned()),
-                };
-                Ok(Some(response))
+                _ => return Err("Invalid type".to_owned()),
+            };
+        } else {
+            {
+                let _data = Data::<f32>::new(by);
+                response = _data.serialize().to_vec();
+                // we set value to incryBy if none was specified
+                data_state
+                    .read()
+                    .data
+                    .insert(key.to_owned(), DataType::Float(_data));
             }
         }
+        Ok(Some(response))
     }
 }

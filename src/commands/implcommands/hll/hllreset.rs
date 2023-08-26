@@ -24,7 +24,7 @@ impl HLLResetCmd {
             return Err("Key not found".to_owned());
         }
         let mut result = opt_key.unwrap();
-        let result_val = result.value_mut().get_data_mut();
+        let result_val = result.value_mut();
         if let DataType::HLL(list) = result_val {
             list.get_mut().reset();
             return Ok(None);

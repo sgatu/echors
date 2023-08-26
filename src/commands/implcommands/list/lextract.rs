@@ -28,7 +28,7 @@ impl LExtractCmd {
         let end_b = cmd.arguments.get(2).unwrap();
         let end_pos = u32::from_le_bytes([end_b[0], end_b[1], end_b[2], end_b[3]]);
         let mut value_obj = opt_list.unwrap();
-        if let DataType::List(list) = value_obj.value_mut().get_data_mut() {
+        if let DataType::List(list) = value_obj.value_mut() {
             return Ok(Some(list.srlz_extract_range_with_start(
                 start_pos as usize,
                 end_pos as usize,

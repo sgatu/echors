@@ -1,9 +1,4 @@
-use std::{
-    sync::atomic::{AtomicU64, Ordering},
-    time::SystemTime,
-};
-
-use super::datastate::DataWrapper;
+use std::time::SystemTime;
 
 pub enum ExpireParameter {
     EXPIREAT(u64),
@@ -24,7 +19,7 @@ impl ExpireParameter {
             _ => ExpireParameter::None,
         }
     }
-    pub fn get_expire(&self, old_data: Option<&DataWrapper>) -> Option<u64> {
+    pub fn get_expire(&self, current_expire: Option<u64>) -> Option<u64> {
         let out = match self {
             ExpireParameter::EXPIREAT(eat) => Some(*eat),
             ExpireParameter::EXPIREIN(ein) => {
@@ -35,8 +30,8 @@ impl ExpireParameter {
                 return Some(time + *ein as u64);
             }
             ExpireParameter::KEEPTTL => {
-                if let Some(data) = old_data {
-                    return Some(data.get_expire().unwrap().load(Ordering::Relaxed));
+                if let Some(e) = current_expire {
+                    return Some(e);
                 } else {
                     None
                 }
@@ -46,4 +41,4 @@ impl ExpireParameter {
         return out;
     }
 }
-pub const NO_EXPIRE: AtomicU64 = AtomicU64::new(0);
+//pub const NO_EXPIRE: AtomicU64 = AtomicU64::new(0);

@@ -4,7 +4,7 @@ use parking_lot::RwLock;
 
 use crate::{
     commands::commands::Command,
-    state::datastate::{DataState, DataType, DataWrapper, ListType, StringType},
+    state::datastate::{DataState, DataType, ListType, StringType},
 };
 
 pub struct LPushCmd {}
@@ -30,14 +30,14 @@ impl LPushCmd {
                         .to_owned(),
                 );
             }
-            data_state.read().data.insert(
-                key.to_owned(),
-                DataWrapper::new(DataType::List(ListType::new(vec_values)), None),
-            );
+            data_state
+                .read()
+                .data
+                .insert(key.to_owned(), DataType::List(ListType::new(vec_values)));
             return Ok(None);
         }
         let mut result = opt_key.unwrap();
-        if let DataType::List(ref mut l) = result.value_mut().get_data_mut() {
+        if let DataType::List(ref mut l) = result.value_mut() {
             for i in 0..values.len() {
                 let value = std::str::from_utf8(values[i])
                     .map_err(|_| format!("Invalid utf8 value at index {}", i).to_owned())?;

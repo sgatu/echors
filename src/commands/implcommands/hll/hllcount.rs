@@ -24,7 +24,7 @@ impl HLLCountCmd {
             return Err("Key not found".to_owned());
         }
         let result = opt_key.unwrap();
-        let result_val = result.value().get_data();
+        let result_val = result.value();
         if let DataType::HLL(list) = result_val {
             return Ok(Some(list.srlz_count()));
         }
