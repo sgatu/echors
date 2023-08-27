@@ -1,0 +1,21 @@
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{h({d(%Y-%m-%d %H:%M:%S.%.3f)(utc)} - {l}: {m}{n})}"
+  file:
+    kind: rolling_file
+    path: "/var/log/echors/log"
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S.%.3f)(utc)} - {h({l})}: {m}{n}"
+    policy:
+      trigger:
+        kind: size
+        limit: 5mb
+      roller:
+        kind: delete
+root:
+  level: trace
+  appenders:
+    - stdout
+    - file

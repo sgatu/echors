@@ -3,19 +3,16 @@ use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
-use rand::random;
+use log::debug;
 use std::{
     cmp, mem,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 use string_builder::ToBytes;
 
 use super::expires::{ExpireParameter, NO_EXPIRE};
 
-pub struct DataState {
-    pub data: DashMap<String, DataWrapper>,
-}
 #[repr(u8)]
 pub enum DataTypeByte {
     Integer = 1,
@@ -94,7 +91,7 @@ impl ListType {
         result.push(DataTypeByte::StrList as u8);
         let start_cmp = cmp::min(start, self.data.len());
         let end_cmp = cmp::min(end, self.data.len());
-        println!(
+        debug!(
             "Range with start: start = {} | {}, end = {} | {}, listLen: {}",
             start,
             start_cmp,
@@ -203,11 +200,82 @@ pub enum DataType {
     List(ListType),
     HLL(HLLType),
 }
-
+pub struct DataState {
+    pub data: DashMap<String, DataWrapper>,
+    removed_count: AtomicU32,
+    last_expired_cleanup: AtomicU64,
+}
 impl DataState {
+    const MIN_TIME_BETWEEN_CLEANING: u64 = 100000;
     pub fn new() -> Self {
         Self {
             data: DashMap::new(),
+            removed_count: AtomicU32::new(0),
+            last_expired_cleanup: AtomicU64::new(0),
+        }
+    }
+    pub fn remove(&self, key: &str) {
+        let old = self.data.remove(key);
+        if let Some(_) = old {
+            self.removed_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub fn remove_all(&self, keys: Vec<&str>) {
+        let mut removed: u32 = 0;
+        for key in keys {
+            let old = self.data.remove(key);
+            if let Some(_) = old {
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            debug!("Removed {} keys", removed);
+            self.removed_count.fetch_add(removed, Ordering::Relaxed);
+        }
+    }
+    pub fn remove_all_string(&self, keys: Vec<String>) {
+        let mut removed: u32 = 0;
+        for key in keys {
+            let old = self.data.remove(&key);
+            if let Some(_) = old {
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            debug!("Removed {} keys", removed);
+            self.removed_count.fetch_add(removed, Ordering::Relaxed);
+        }
+    }
+    pub fn maintenance_work(&self) {
+        let current_removed = self.removed_count.load(Ordering::SeqCst);
+        if current_removed as f32 / self.data.len() as f32 > 0.1f32 || current_removed > 50000 {
+            debug!("Hashmap shrinking...");
+            self.data.shrink_to_fit();
+            self.removed_count.store(0, Ordering::SeqCst);
+        }
+        let last_expired_cleanup = self.last_expired_cleanup.load(Ordering::SeqCst);
+        let current_ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        if (current_ts - last_expired_cleanup) > Self::MIN_TIME_BETWEEN_CLEANING
+            || last_expired_cleanup == 0
+        {
+            let mut rm_keys: Vec<String> = Vec::new();
+            self.data.iter().for_each(|kv| {
+                let exp = kv.get_expire();
+                if let Some(ex) = exp {
+                    if ex.load(Ordering::Relaxed) < current_ts {
+                        rm_keys.push(kv.key().clone());
+                    }
+                }
+            });
+            if rm_keys.len() > 0 {
+                self.remove_all_string(rm_keys);
+            }
+            self.last_expired_cleanup
+                .store(current_ts, Ordering::SeqCst);
         }
     }
     //this will get the value if exists and not expired, it also deletes the value if expired and returns None
@@ -219,6 +287,7 @@ impl DataState {
             }
             let wrapper = data.unwrap();
             let expire = wrapper.get_expire();
+
             if let Some(e) = expire {
                 let current = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -231,35 +300,9 @@ impl DataState {
                 return Some(wrapper);
             }
         }
-        let r = random::<u16>();
-        if r < 20 || self.data.len() == 0 {
-            println!("Shrinking...currLen: {}", self.data.len());
-            self.data.shrink_to_fit();
-        }
         // if key exists but expire check didn't return early
-        self.data.remove(key);
+        self.remove(key);
         return None;
-    }
-    pub fn set(&self, key: &str, value: DataType, expire: ExpireParameter) -> Result<(), ()> {
-        let current_data = self.get_mut(key);
-
-        if let Some(mut d) = current_data {
-            let new_expire = expire.calc_new_expire(Some(&*d));
-            let data = DataWrapper::new(
-                value,
-                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
-            );
-            let _ = mem::replace(&mut *d, data);
-            Ok(())
-        } else {
-            let new_expire = expire.calc_new_expire(None);
-            let data = DataWrapper::new(
-                value,
-                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
-            );
-            self.data.insert(key.to_owned(), data);
-            Ok(())
-        }
     }
     //same as above but mut
     pub fn get_mut(&self, key: &str) -> Option<RefMut<'_, String, DataWrapper>> {
@@ -283,14 +326,31 @@ impl DataState {
             }
         }
         // if key exists but expire check didn't return early
-        let r = random::<u8>();
-        if r < 2 || self.data.len() == 0 {
-            println!("Shrinking...currLen: {}", self.data.len());
-            self.data.shrink_to_fit();
-        }
-        self.data.remove(key);
+        self.remove(key);
         return None;
     }
+    pub fn set(&self, key: &str, value: DataType, expire: ExpireParameter) -> Result<(), ()> {
+        let current_data = self.get_mut(key);
+
+        if let Some(mut d) = current_data {
+            let new_expire = expire.calc_new_expire(Some(&*d));
+            let data = DataWrapper::new(
+                value,
+                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
+            );
+            let _ = mem::replace(&mut *d, data);
+            Ok(())
+        } else {
+            let new_expire = expire.calc_new_expire(None);
+            let data = DataWrapper::new(
+                value,
+                new_expire.map_or_else(|| None, |e| Some(AtomicU64::new(e))),
+            );
+            self.data.insert(key.to_owned(), data);
+            Ok(())
+        }
+    }
+
     pub fn flush(&mut self) {
         self.data = DashMap::new();
     }

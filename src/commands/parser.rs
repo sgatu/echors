@@ -1,3 +1,5 @@
+use log::warn;
+
 use super::commands::Command;
 use super::commands::CommandType;
 
@@ -38,7 +40,7 @@ impl Parser {
             return Err(ArgResult::EOF);
         }
         if data.len() < 4 {
-            println!("Data too small, not even length");
+            warn!("Data too small, not even length");
             return Err(ArgResult::Error);
         }
         let split = data.split_at(4);

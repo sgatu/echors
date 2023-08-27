@@ -7,9 +7,10 @@ mod tests;
 use commands::commands::Command;
 use config::ApplicationConfig;
 use config_file::FromConfigFile;
+use log::{info, trace, warn};
 use parking_lot::RwLock;
 use state::datastate::DataState;
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -36,7 +37,7 @@ async fn manage_socket(
     data_state: Arc<RwLock<DataState>>,
 ) {
     let socket_addr = socket.peer_addr().unwrap();
-    println!("Client {} connected.", socket_addr);
+    info!("Client {} connected.", socket_addr);
     let result = loop {
         let buf_len = match socket.read_u32_le().await {
             Ok(n) => n,
@@ -99,7 +100,7 @@ async fn manage_socket(
         let mut mut_ser_state = server_state.write();
         mut_ser_state.current_connections -= 1;
     }
-    eprintln!("Closing socket {} due to {}", socket_addr, result);
+    warn!("Closing socket {} due to {}", socket_addr, result);
 }
 
 async fn process_cmd<'a>(
@@ -124,15 +125,31 @@ async fn process_cmd<'a>(
         Err(e) => Err(e),
     }
 }
+fn _maintenance_work(data_state: &Arc<RwLock<DataState>>) {
+    trace!("Maintenance start");
+    data_state.read().maintenance_work();
+    trace!("Maintenance end");
+}
+async fn maintenance_work(data_state: Arc<RwLock<DataState>>) {
+    loop {
+        _maintenance_work(&data_state);
+        tokio::time::sleep(Duration::from_millis(5000)).await;
+    }
+}
+fn init_logging(app_config: &ApplicationConfig) {
+    log4rs::init_file(app_config.log_config_path.clone(), Default::default()).unwrap();
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_cfg: ApplicationConfig =
         ApplicationConfig::from_config_file(PathBuf::from("./echors.toml")).unwrap();
+    init_logging(&app_cfg);
     let server_state = Arc::new(RwLock::new(ServerState::new(env!("CARGO_PKG_VERSION"))));
     let data_state = Arc::new(RwLock::new(DataState::new()));
-    println!("Starting server. Binding on: {}", &app_cfg.bind);
+    info!("Starting server. Binding on: {}", &app_cfg.bind);
     let listener: TcpListener = TcpListener::bind(&app_cfg.bind).await?;
     //let max_conn_limiter = Arc::new(Semaphore::new(app_cfg.max_connections as usize));
+    tokio::spawn(maintenance_work(data_state.clone()));
     loop {
         // let permit = max_conn_limiter.clone().acquire_owned().await.unwrap();
         match listener.accept().await {
@@ -143,9 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     current_connections = ro_state_data.current_connections;
                 }
                 if current_connections >= app_cfg.max_connections as u32 {
-                    println!("Dropping {:?} due to max_conn limitation", _addr);
-                    // i think drop can be ignored, there is no next instruction, it should be dropped
-                    // drop(_socket);
+                    warn!("Dropping {:?} due to max_conn limitation", _addr);
                 } else {
                     {
                         let mut mut_state_data = server_state.write();
@@ -159,7 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ));
                 }
             }
-            Err(e) => println!("{:?}", e),
+            Err(e) => warn!("{:?}", e),
         }
     }
 }
